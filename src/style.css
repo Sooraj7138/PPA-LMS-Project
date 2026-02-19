@@ -169,7 +169,7 @@ html {
 ::before,
 ::after {
     box-sizing: border-box;
-    undefined: undefined;
+    
     border-width: 0;
     border-style: solid;
     border-color: var(--gjs-t-color-border);
@@ -178,7 +178,7 @@ html {
 html,
 :host {
     line-height: 1.5;
-    undefined: undefined;
+    
     -webkit-text-size-adjust: 100%;
     -moz-tab-size: 4;
     tab-size: 4;
@@ -190,13 +190,13 @@ html,
 
 body {
     margin: 0;
-    undefined: undefined;
+    
     line-height: inherit;
 }
 
 hr {
     height: 0;
-    undefined: undefined;
+    
     color: inherit;
     border-top-width: 1px;
 }
@@ -230,7 +230,7 @@ kbd,
 samp,
 pre {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    undefined: undefined;
+    
     font-feature-settings: normal;
     font-variation-settings: normal;
     font-size: 1em;
@@ -258,7 +258,7 @@ sup {
 
 table {
     text-indent: 0;
-    undefined: undefined;
+    
     border-color: inherit;
     border-collapse: collapse;
 }
@@ -269,7 +269,7 @@ optgroup,
 select,
 textarea {
     font-family: inherit;
-    undefined: undefined;
+    
     font-feature-settings: inherit;
     font-variation-settings: inherit;
     font-size: 100%;
@@ -291,7 +291,7 @@ input:where([type='button']),
 input:where([type='reset']),
 input:where([type='submit']) {
     -webkit-appearance: button;
-    undefined: undefined;
+    
     background-color: transparent;
     background-image: none;
 }
@@ -315,7 +315,7 @@ progress {
 
 [type='search'] {
     -webkit-appearance: textfield;
-    undefined: undefined;
+    
     outline-offset: -2px;
 }
 
@@ -325,7 +325,7 @@ progress {
 
 ::-webkit-file-upload-button {
     -webkit-appearance: button;
-    undefined: undefined;
+    
     font: inherit;
 }
 
@@ -377,7 +377,7 @@ textarea {
 input::placeholder,
 textarea::placeholder {
     opacity: 1;
-    undefined: undefined;
+    
     color: color-mix(in srgb, var(--gjs-t-color-secondary) 66%, white);
 }
 
@@ -399,7 +399,7 @@ iframe,
 embed,
 object {
     display: block;
-    undefined: undefined;
+    
     vertical-align: middle;
 }
 
@@ -556,7 +556,6 @@ video {
 
 .nav-cta-link-active {
     background-color: color-mix(in srgb, var(--gjs-t-color-on-dark) 25%, transparent) !important;
-    border-color: color-mix(in srgb, var(--gjs-t-color-on-dark) 30%, transparent);
 }
 
 .header-utility-nav {
@@ -589,7 +588,6 @@ video {
 }
 
 .main-content {
-    max-width: 72rem;
     margin-left: auto;
     margin-right: auto;
     min-height: calc(100vh - 260px);
@@ -615,8 +613,8 @@ video {
             color-mix(in srgb, var(--gjs-t-color-primary) 16%, transparent) 36%,
             color-mix(in srgb, var(--gjs-t-color-primary) 24%, transparent) 100%
         ),
-        radial-gradient(circle at 10% 14%, color-mix(in srgb, var(--gjs-t-color-highlight) 42%, transparent) 0%, transparent 38%),
-        radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--gjs-t-color-accent) 34%, transparent) 0%, transparent 36%),
+        radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--gjs-t-color-highlight) 34%, transparent) 0%, transparent 36%),
+        radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--gjs-t-color-accent) 28%, transparent) 0%, transparent 32%),
         linear-gradient(
             120deg,
             color-mix(in srgb, var(--gjs-t-color-accent-soft) 8%, transparent) 0%,
@@ -648,8 +646,8 @@ video {
     border-radius: inherit;
     pointer-events: none;
     background:
-        radial-gradient(circle at 8% 12%, color-mix(in srgb, var(--gjs-t-color-highlight) 22%, transparent) 0%, transparent 32%),
-        radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--gjs-t-color-accent) 18%, transparent) 0%, transparent 28%);
+        radial-gradient(circle at 10% 92%, color-mix(in srgb, var(--gjs-t-color-accent-strong) 18%, transparent) 0%, transparent 28%),
+        radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--gjs-t-color-accent) 12%, transparent) 0%, transparent 28%);
 }
 
 .manager-dashboard-content > div {
@@ -953,6 +951,7 @@ video {
 
 .role-tabs {
     display: flex;
+    justify-content: center;
     gap: 0.5rem;
     padding: 0.25rem;
     background-color: color-mix(in srgb, var(--gjs-t-color-accent-soft) 72%, white);

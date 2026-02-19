@@ -1,12 +1,114 @@
-import { useState, useMemo, useRef } from 'react'
-import './style.css'
+'use client';
 
-function App() {
+import { useState, useMemo, useRef, useEffect } from 'react'
+import './style.css'
+import ManagerDashboard from './ManagerDashboard'
+
+export default function App() {
+  const STORAGE_KEYS = {
+    activePage: "lms_active_page",
+    role: "lms_role",
+  };
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activePage, setActivePage] = useState("home");
-  const [role, setRole] = useState("User");
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window === "undefined") return "home";
+    return localStorage.getItem(STORAGE_KEYS.activePage) || "home";
+  });
+  const [role, setRole] = useState(() => {
+    if (typeof window === "undefined") return "User";
+    return localStorage.getItem(STORAGE_KEYS.role) || "User";
+  });
   const usernameRef = useRef(null);
   const tabRefs = useRef([]);
+  const [lesseeData, setlesseeData] = useState([]);
+  const [landData, setlandData] = useState([]);
+  const [allData, setAllData] = useState({ lesseeData: [], landData: [] })
+  const [managerPage, setManagerPage] = useState("generate-demand");
+  const [error, setError] = useState("");
+  const [names, setNames] = useState([])
+
+
+  // useEffect(()=>{
+  //   fetch("http://localhost:5000/api/LesseeFullView")
+  //   .then((res)=>{if(!res.ok) throw new Error(`HTTP $(res.status)`);
+  //     return res.json();
+  //   })
+  //   .then((data)=>setlesseeData(data))
+  //   .catch((err)=>setError(err.message))
+  // }, [])
+
+  // useEffect(()=>{
+  //   fetch("http://localhost:5000/api/LandData")
+  //   .then((res)=>{if(!res.ok) throw new Error(`HTTP $(res.status)`);
+  //     return res.json();
+  //   })
+  //   .then((data)=>setlandData(data))
+  //   .catch((err)=>setError(err.message))
+  // }, [])
+
+  useEffect(() => {
+    function fetchJson(url) {
+      return fetch(url).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
+          throw new Error(msg);
+        }
+        return data;
+      });
+    }
+
+    Promise.all([
+      fetchJson("http://localhost:5000/api/LesseeFullView"),
+      fetchJson("http://localhost:5000/api/LandData"),
+    ])
+      .then(([lessee, land]) => {
+        const safeLessee = Array.isArray(lessee) ? lessee : [];
+        const safeLand = Array.isArray(land) ? land : [];
+        setlesseeData(safeLessee);
+        setlandData(safeLand);
+        setAllData({ lesseeData: safeLessee, landData: safeLand });
+        console.log("both:", { lesseeData: safeLessee, landData: safeLand });
+      })
+      .catch((err) => {
+        setError(err.message);
+        setlesseeData([]);
+        setlandData([]);
+        setAllData({ lesseeData: [], landData: [] });
+      });
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.activePage, activePage);
+  }, [activePage]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.role, role);
+  }, [role]);
+  
+
+  // useEffect(() => {
+  //     if (!Array.isArray(lesseeData) || lesseeData.length === 0) return;
+
+  //     lesseeData.forEach((row, index) => {
+  //       setNames(lesseeData.map((row)=>row.LesseeName))
+  //     });
+  //   }, [lesseeData]);
+
+  //   useEffect(() => {
+  //     if (!Array.isArray(landData) || landData.length === 0) return;
+
+  //     landData.forEach((row, index) => {
+  //       setNames(landData.map((row)=>row.LandName))
+  //     });
+  //   }, [landData]);
+  // useEffect(() => {
+  //   if (!Array.isArray(allData) || allData.length === 0) return;
+
+  //   allData.forEach((row, index) => {
+  //     setAllData(allData.map((row)=>row.LesseeName))
+  //   });
+  // }, [allData]);
 
   const roleConfig = useMemo(
     () => ({
@@ -40,6 +142,7 @@ function App() {
   function handleLoginSubmit(e) {
     e.preventDefault();
     if (role === "Manager") {
+      setManagerPage("generate-demand");
       setActivePage("manager-dashboard");
     } else {
       alert(`${role} Login functionality is being developed.`);
@@ -47,6 +150,7 @@ function App() {
   }
 
   function onLogout() {
+    setManagerPage("generate-demand");
     setActivePage("home");
     setRole("User");
   }
@@ -82,6 +186,13 @@ function App() {
   const isHomePage = activePage === "home";
   const isLoginPage = activePage === "login";
   const isManagerDashboard = activePage === "manager-dashboard";
+  const managerNavItems = [
+    { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
+    { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },
+    { id: "user-data", label: "User's Data", icon: "lucide-users" },
+    { id: "demand-status", label: "Status of Demand Note", icon: "lucide-check-square" },
+    { id: "user-eoi", label: "View User's EOI", icon: "lucide-handshake" },
+  ];
 
   return (
     <div className={`body-container bg-[#f5f7fa] text-[#0b1f3b] text-base leading-relaxed ${isManagerDashboard ? "manager-dashboard-active" : ""}`.trim()}>
@@ -127,64 +238,103 @@ function App() {
             </button>
             <ul
               id="primary-nav-links"
-              className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:w-auto md:flex-row md:items-center md:gap-2`}
+              className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:flex-row md:items-center md:gap-2 ${isManagerDashboard ? "md:flex-1" : "md:w-auto"}`}
             >
-              <li>
-                <a
-                  href="#"
-                  id="home-link"
-                  className={`nav-link block rounded-md px-3 py-2 hover:bg-white/10 ${isHomePage ? "nav-link-active" : ""}`.trim()}
-                  onClick={onHomeClick}
-                >
-                  Home
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  id="about-link"
-                  className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
-                  onClick={(e) => onPlaceholderNavClick(e, "About page will be implemented soon.")}
-                >
-                  About
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  id="services-link"
-                  className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
-                  onClick={(e) => onPlaceholderNavClick(e, "Services page will be implemented soon.")}
-                >
-                  Services
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  id="contact-link"
-                  className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
-                  onClick={(e) => onPlaceholderNavClick(e, "Contact page will be implemented soon.")}
-                >
-                  Contact
-                </a>
-              </li>
-              <li className="md:ml-2">
-                <a
-                  href="#"
-                  id="login-link"
-                  className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || activePage === "manager-dashboard" ? "nav-cta-link-active" : ""}`.trim()}
-                  onClick={activePage === "manager-dashboard" ? (e) => e.preventDefault() : onLoginClick}
-                >
-                  {activePage === "manager-dashboard" ? "Dashboard" : "Land Login"}
-                </a>
-              </li>
+              {isManagerDashboard ? (
+                <>
+                  {managerNavItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => setManagerPage(item.id)}
+                        className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                          managerPage === item.id ? "bg-white text-[#0b1f3b]" : "text-white hover:bg-white/10"
+                        }`}
+                      >
+                        <img
+                          src={`https://api.iconify.design/${item.icon}.svg?color=${managerPage === item.id ? "%230b1f3b" : "white"}`}
+                          alt=""
+                          className="w-4 h-4 mr-2"
+                        />
+                        {item.label}
+                      </button>
+                    </li>
+                  ))}
+                  <li className="md:ml-auto">
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="inline-flex items-center rounded-md px-3 py-2 text-sm font-bold bg-red-600 text-white hover:bg-red-500 active:bg-red-700 transition-colors shadow-sm ring-1 ring-red-400/50"
+                    >
+                      <img
+                        src="https://api.iconify.design/lucide-log-out.svg?color=white"
+                        alt=""
+                        className="w-4 h-4 mr-2"
+                      />
+                      Sign Out
+                    </button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <a
+                      href="#"
+                      id="home-link"
+                      className={`nav-link block rounded-md px-3 py-2 hover:bg-white/10 ${isHomePage ? "nav-link-active" : ""}`.trim()}
+                      onClick={onHomeClick}
+                    >
+                      Home
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="about-link"
+                      className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
+                      onClick={(e) => onPlaceholderNavClick(e, "About page will be implemented soon.")}
+                    >
+                      About
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="services-link"
+                      className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
+                      onClick={(e) => onPlaceholderNavClick(e, "Services page will be implemented soon.")}
+                    >
+                      Services
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      id="contact-link"
+                      className="nav-link block rounded-md px-3 py-2 hover:bg-white/10"
+                      onClick={(e) => onPlaceholderNavClick(e, "Contact page will be implemented soon.")}
+                    >
+                      Contact
+                    </a>
+                  </li>
+                  <li className="md:ml-2">
+                    <a
+                      href="#"
+                      id="login-link"
+                      className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || activePage === "manager-dashboard" ? "nav-cta-link-active" : ""}`.trim()}
+                      onClick={activePage === "manager-dashboard" ? (e) => e.preventDefault() : onLoginClick}
+                    >
+                      {activePage === "manager-dashboard" ? "Dashboard" : "Land Login"}
+                    </a>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </nav>
       </header>
 
-      <main className={`main-content ${isManagerDashboard ? "main-content-wide" : ""}`.trim()} id="ithhf">
+      <main className={`main-content ${activePage !== "home" ? "max-w-[72rem]" : "max-w-[90rem]"} ${isManagerDashboard ? "main-content-wide" : ""}`.trim()} id="ithhf">
         {activePage === "home" && (
           <section className="home-page-section" id="home-page">
             <div className="home-showcase-card">
@@ -460,7 +610,7 @@ function App() {
         )}
         
         {activePage === "manager-dashboard" && (
-          <ManagerDashboard onLogout={onLogout} />
+          <ManagerDashboard allData={allData} managerPage={managerPage} />
         )}
       </main>
 
@@ -508,527 +658,3 @@ function App() {
   );
 }
 
-function ManagerDashboard({ onLogout }) {
-  const [managerPage, setManagerPage] = useState("generate-demand");
-  const landTypes = ["Lease", "Market", "License", "ROW", "Open Space", "Building"];
-  const [selectedLandType, setSelectedLandType] = useState("Lease");
-  const landTypeTitle = `${selectedLandType} Land Data`;
-  const [isGenerateDemandModalOpen, setIsGenerateDemandModalOpen] = useState(false);
-  const [demandForm, setDemandForm] = useState({
-    amount: "",
-    dueDate: "",
-    description: "",
-  });
-
-  const navItems = [
-    { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
-    { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },
-    { id: "user-data", label: "User's Data", icon: "lucide-users" },
-    { id: "demand-status", label: "Status of Demand Note", icon: "lucide-check-square" },
-    { id: "user-eoi", label: "View User's EOI", icon: "lucide-handshake" },
-  ];
-
-  function openGenerateDemandModal() {
-    setIsGenerateDemandModalOpen(true);
-  }
-
-  function closeGenerateDemandModal() {
-    setIsGenerateDemandModalOpen(false);
-  }
-
-  function onDemandFormChange(e) {
-    const { name, value } = e.target;
-    setDemandForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  function submitGenerateDemand() {
-    const { amount, dueDate, description } = demandForm;
-    if (amount.trim() !== "" && dueDate !== "" && description.trim() !== "") {
-      alert("Demand note generated successfully!");
-      closeGenerateDemandModal();
-      setDemandForm({ amount: "", dueDate: "", description: "" });
-      return;
-    }
-    alert("Please fill all fields.");
-  }
-
-  return (
-    <div className="manager-dashboard-layout flex flex-col lg:flex-row gap-6">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-72 flex-shrink-0">
-        <nav className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-6">
-          <div className="p-4 bg-slate-50 border-b border-slate-200">
-            <h2 className="text-sm font-bold text-[#0b1f3b] uppercase tracking-wider">Manager Console</h2>
-          </div>
-          <ul className="flex flex-col">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => setManagerPage(item.id)}
-                  className={`w-full text-left px-4 py-3.5 text-sm font-medium transition-all flex items-center border-l-4 ${
-                    managerPage === item.id
-                      ? "bg-[#0b1f3b]/5 text-[#0b1f3b] border-[#0b1f3b]"
-                      : "text-slate-600 hover:bg-slate-50 border-transparent"
-                  }`}
-                >
-                  <img
-                    src={`https://api.iconify.design/${item.icon}.svg?color=${managerPage === item.id ? "%230b1f3b" : "%234b5563"}`}
-                    alt=""
-                    className="w-5 h-5 mr-3"
-                  />
-                  {item.label}
-                </button>
-              </li>
-            ))}
-            <li className="border-t border-slate-100 mt-2">
-              <button
-                onClick={onLogout}
-                className="w-full text-left px-4 py-4 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center border-l-4 border-transparent"
-              >
-                <img
-                  src="https://api.iconify.design/lucide-log-out.svg?color=%23dc2626"
-                  alt=""
-                  className="w-5 h-5 mr-3"
-                />
-                Sign Out
-              </button>
-            </li>
-          </ul>
-        </nav>
-      </aside>
-
-      {/* Content Area */}
-      <div className="manager-dashboard-content flex-1 min-w-0">
-        {managerPage === "generate-demand" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-2xl font-bold text-[#0b1f3b]">Generate Demand Note</h3>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Type</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Types</option>
-                    <option value="lease">Lease</option>
-                    <option value="market">Market</option>
-                    <option value="license">License</option>
-                    <option value="row">ROW</option>
-                    <option value="openspace">Open Space</option>
-                    <option value="building">Building</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Name</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Names</option>
-                    <option value="plot-a12">Plot A-12</option>
-                    <option value="shop-m05">Shop M-05</option>
-                    <option value="license-l08">License L-08</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Code</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Codes</option>
-                    <option value="L001">L001</option>
-                    <option value="M002">M002</option>
-                    <option value="LC003">LC003</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Allotment Type</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">--</option>
-                    <option value="Upfront">Upfront</option>
-                    <option value="Annual">Annual</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                      <th className="px-6 py-4">Consumer Name</th>
-                      <th className="px-6 py-4">Land Type</th>
-                      <th className="px-6 py-4">Land Name</th>
-                      <th className="px-6 py-4 text-center">Due Date</th>
-                      <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[
-                      { name: "John Doe", type: "Lease", land: "Plot A-12", date: "15/07/2023" },
-                      { name: "Jane Smith", type: "Market", land: "Shop M-05", date: "30/06/2023" },
-                      { name: "Robert Johnson", type: "License", land: "License L-08", date: "10/07/2023" }
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
-                        <td className="px-6 py-4 text-slate-600">{row.type}</td>
-                        <td className="px-6 py-4 text-slate-600">{row.land}</td>
-                        <td className="px-6 py-4 text-center text-slate-500 font-medium">{row.date}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={openGenerateDemandModal}
-                            className="inline-flex items-center px-4 py-2 bg-[#0b1f3b] text-white rounded-lg text-xs font-bold hover:bg-[#1f4f82] transition-all active:scale-95 shadow-sm"
-                          >
-                            <img src="https://api.iconify.design/lucide-file-plus.svg?color=white" alt="" className="w-4 h-4 mr-1.5" />
-                            Generate
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {managerPage === "master-land" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="text-2xl font-bold text-[#0b1f3b]">Master Land Data</h3>
-              <button className="inline-flex items-center px-4 py-2.5 bg-[#0b1f3b] text-white rounded-lg text-sm font-bold hover:bg-[#1f4f82] transition-all active:scale-95 shadow-md">
-                <img src="https://api.iconify.design/lucide-plus.svg?color=white" alt="" className="w-4 h-4 mr-2" />
-                Add New Record
-              </button>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-6">
-              <div className="w-full lg:w-48 flex-shrink-0">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-2 space-y-1">
-                  {landTypes.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setSelectedLandType(type)}
-                      className={`w-full text-left px-3 py-2.5 text-xs font-bold rounded-lg transition-all ${
-                        type === selectedLandType ? "bg-[#0b1f3b] text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                    <h4 className="text-sm font-bold text-slate-700">{landTypeTitle}</h4>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left border-collapse">
-                      <thead>
-                        <tr className="bg-white text-slate-500 font-bold text-xs uppercase border-b border-slate-100">
-                          <th className="px-6 py-4">Name</th>
-                          <th className="px-6 py-4">Area (sq.m)</th>
-                          <th className="px-6 py-4">Code</th>
-                          <th className="px-6 py-4">Total Rate</th>
-                          <th className="px-6 py-4 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {[
-                          { name: "Plot A-12", area: "500", code: "L001", rate: "₹ 25,000" },
-                          { name: "Plot B-07", area: "750", code: "L002", rate: "₹ 35,000" }
-                        ].map((row, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
-                            <td className="px-6 py-4 text-slate-600">{row.area}</td>
-                            <td className="px-6 py-4 font-mono text-slate-500">{row.code}</td>
-                            <td className="px-6 py-4 font-bold text-emerald-600">{row.rate}</td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
-                                  <img src="https://api.iconify.design/lucide-edit.svg?color=%23d97706" alt="" className="w-4 h-4" />
-                                </button>
-                                <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                                  <img src="https://api.iconify.design/lucide-trash-2.svg?color=%23dc2626" alt="" className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {managerPage === "user-data" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <h3 className="text-2xl font-bold text-[#0b1f3b]">User's Data</h3>
-
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Type</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Types</option>
-                    <option value="lease">Lease</option>
-                    <option value="market">Market</option>
-                    <option value="license">License</option>
-                    <option value="row">ROW</option>
-                    <option value="openspace">Open Space</option>
-                    <option value="building">Building</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Name</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Names</option>
-                    <option value="plot-a12">Plot A-12</option>
-                    <option value="shop-m05">Shop M-05</option>
-                    <option value="license-l08">License L-08</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-tight">Land Code</label>
-                  <select className="w-full rounded-lg border-slate-200 text-sm p-2.5 border bg-slate-50/50 focus:ring-2 focus:ring-[#0b1f3b]/10 focus:border-[#0b1f3b] transition-all">
-                    <option value="">All Codes</option>
-                    <option value="L001">L001</option>
-                    <option value="M002">M002</option>
-                    <option value="LC003">LC003</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                      <th className="px-6 py-4">Consumer Name</th>
-                      <th className="px-6 py-4">Address</th>
-                      <th className="px-6 py-4">Mobile Number</th>
-                      <th className="px-6 py-4">Allotted Land</th>
-                      <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[
-                      { name: "John Doe", address: "123, Main Street, Paradip", phone: "+91 9876543210", land: "Plot A-12 (Lease)" },
-                      { name: "Jane Smith", address: "456, Park Avenue, Paradip", phone: "+91 8765432109", land: "Shop M-05 (Market)" },
-                      { name: "Robert Johnson", address: "789, Beach Road, Paradip", phone: "+91 7654321098", land: "License L-08 (License)" }
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
-                        <td className="px-6 py-4 text-slate-600 text-xs leading-relaxed max-w-[200px]">{row.address}</td>
-                        <td className="px-6 py-4 font-medium text-slate-500">{row.phone}</td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">{row.land}</td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button className="px-3 py-1.5 text-amber-600 bg-amber-50 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors">Edit</button>
-                            <button className="px-3 py-1.5 text-red-600 bg-red-50 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors">Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {managerPage === "demand-status" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <h3 className="text-2xl font-bold text-[#0b1f3b]">View Status of Demand Note</h3>
-            
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                      <th className="px-6 py-4">Consumer Name</th>
-                      <th className="px-6 py-4">Land Type</th>
-                      <th className="px-6 py-4">Land Name</th>
-                      <th className="px-6 py-4 text-center">Due Date</th>
-                      <th className="px-6 py-4 text-center">Status of Demand Note</th>
-                      <th className="px-6 py-4 text-right">Status of Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[
-                      { name: "John Doe", type: "Lease", land: "Plot A-12", date: "15/07/2023", status: "Approved", payment: "Paid" },
-                      { name: "Jane Smith", type: "Market", land: "Shop M-05", date: "30/06/2023", status: "Action Needed", payment: "Not Paid" },
-                      { name: "Robert Johnson", type: "License", land: "License L-08", date: "10/07/2023", status: "Approved", payment: "Closed" },
-                      { name: "Michael Wilson", type: "Building", land: "Building B-03", date: "25/07/2023", status: "Approved", payment: "Not Paid" }
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
-                        <td className="px-6 py-4 text-slate-600">{row.type}</td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">{row.land}</td>
-                        <td className="px-6 py-4 text-center text-slate-500 font-medium">{row.date}</td>
-                        <td className="px-6 py-4 text-center">
-                          {row.status === "Action Needed" ? (
-                            <button className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-all shadow-sm">Send for Recheck</button>
-                          ) : (
-                            <span className="inline-flex px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold ring-1 ring-inset ring-green-600/20">Approved</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ring-1 ring-inset ${
-                            row.payment === "Paid" ? "bg-emerald-100 text-emerald-700 ring-emerald-600/20" :
-                            row.payment === "Not Paid" ? "bg-red-100 text-red-700 ring-red-600/20" :
-                            "bg-slate-100 text-slate-700 ring-slate-600/20"
-                          }`}>
-                            {row.payment}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {managerPage === "user-eoi" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <h3 className="text-2xl font-bold text-[#0b1f3b]">View User's EOI</h3>
-            
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                      <th className="px-6 py-4">EOI ID</th>
-                      <th className="px-6 py-4">Consumer Name</th>
-                      <th className="px-6 py-4">Land Type</th>
-                      <th className="px-6 py-4">Land Name</th>
-                      <th className="px-6 py-4">Applied Date</th>
-                      <th className="px-6 py-4 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[
-                      { id: "EOI001", name: "John Doe", type: "Lease", land: "Plot A-12", date: "10/05/2023" },
-                      { id: "EOI002", name: "Jane Smith", type: "Market", land: "Shop M-05", date: "12/05/2023" },
-                      { id: "EOI003", name: "Robert Johnson", type: "License", land: "License L-08", date: "15/05/2023" },
-                      { id: "EOI004", name: "Michael Wilson", type: "Building", land: "Building B-03", date: "18/05/2023" }
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-mono font-bold text-slate-900">{row.id}</td>
-                        <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
-                        <td className="px-6 py-4 text-slate-600">{row.type}</td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">{row.land}</td>
-                        <td className="px-6 py-4 text-slate-500 font-medium">{row.date}</td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="inline-flex px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold ring-1 ring-inset ring-blue-600/20">Applied</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {isGenerateDemandModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
-          onClick={closeGenerateDemandModal}
-        >
-          <div
-            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="generate-demand-modal-title"
-          >
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <h4 id="generate-demand-modal-title" className="text-lg font-bold text-[#0b1f3b]">
-                Generate Demand Note
-              </h4>
-              <button
-                type="button"
-                onClick={closeGenerateDemandModal}
-                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close"
-              >
-                <img src="https://api.iconify.design/lucide-x.svg?color=%234b5563" alt="" className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 px-5 py-4">
-              <div className="space-y-1.5">
-                <label htmlFor="demand-amount" className="text-sm font-semibold text-slate-700">
-                  Amount
-                </label>
-                <input
-                  id="demand-amount"
-                  name="amount"
-                  type="text"
-                  value={demandForm.amount}
-                  onChange={onDemandFormChange}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0b1f3b] focus:outline-none focus:ring-2 focus:ring-[#0b1f3b]/10"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="demand-due-date" className="text-sm font-semibold text-slate-700">
-                  Due Date
-                </label>
-                <input
-                  id="demand-due-date"
-                  name="dueDate"
-                  type="date"
-                  value={demandForm.dueDate}
-                  onChange={onDemandFormChange}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0b1f3b] focus:outline-none focus:ring-2 focus:ring-[#0b1f3b]/10"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="demand-description" className="text-sm font-semibold text-slate-700">
-                  Description
-                </label>
-                <textarea
-                  id="demand-description"
-                  name="description"
-                  rows="3"
-                  value={demandForm.description}
-                  onChange={onDemandFormChange}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0b1f3b] focus:outline-none focus:ring-2 focus:ring-[#0b1f3b]/10"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-              <button
-                type="button"
-                onClick={closeGenerateDemandModal}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitGenerateDemand}
-                className="rounded-lg bg-[#0b1f3b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f4f82]"
-              >
-                Generate
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default App

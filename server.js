@@ -33,7 +33,6 @@ app.get("/api/LesseeFullView", async (req, res) => {
   try {
     const p = await getPool();
     const result = await p.request().query("SELECT * FROM LesseeFullView");
-    console.log("RES ",result)
     res.json(result.recordset);
   } catch (err) {
     console.error(err);
@@ -45,7 +44,28 @@ app.get("/api/LandData", async (req, res) => {
   try {
     const p = await getPool();
     const result = await p.request().query("SELECT * FROM LandData");
-    console.log("RES ",result)
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB query failed" });
+  }
+});
+
+app.get("/api/EoiTable", async (req, res) => {
+  try {
+    const p = await getPool();
+    const result = await p.request().query("SELECT * FROM EOITable");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB query failed" });
+  }
+});
+
+app.get("/api/DemandNotes", async (req, res) => {
+  try {
+    const p = await getPool();
+    const result = await p.request().query("SELECT * FROM DemandNotes");
     res.json(result.recordset);
   } catch (err) {
     console.error(err);

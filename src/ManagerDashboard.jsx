@@ -9,6 +9,8 @@ import { formatDateOnly, normalizeLandType } from './manager/utils'
 export default function ManagerDashboard({ allData, managerPage }) {
   const landRows = Array.isArray(allData?.landData) ? allData.landData : [];
   const lesseeRows = Array.isArray(allData?.lesseeData) ? allData.lesseeData : [];
+  const eoiRows = Array.isArray(allData?.eoiData) ? allData.eoiData : [];
+  const demandRows = Array.isArray(allData?.demandNotes) ? allData.demandNotes : [];
 
   useEffect(() => {
     const hasLessee = lesseeRows.length > 0;
@@ -27,8 +29,8 @@ export default function ManagerDashboard({ allData, managerPage }) {
           <MasterLandDataSection landRows={landRows} normalizeLandType={normalizeLandType} />
         )}
         {managerPage === "user-data" && <UserDataSection lesseeRows={lesseeRows} landRows={landRows} />}
-        {managerPage === "demand-status" && <DemandStatusSection />}
-        {managerPage === "user-eoi" && <UserEoiSection />}
+        {managerPage === "demand-status" && <DemandStatusSection demandRows={demandRows} />}
+        {managerPage === "user-eoi" && <UserEoiSection eoiRows={eoiRows} formatDateOnly={formatDateOnly} />}
       </div>
     </div>
   );

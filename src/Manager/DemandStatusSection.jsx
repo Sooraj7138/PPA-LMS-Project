@@ -1,4 +1,4 @@
-export default function DemandStatusSection() {
+export default function DemandStatusSection({ demandRows }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <h3 className="text-2xl font-bold text-[#0b1f3b]">View Status of Demand Note</h3>
@@ -17,14 +17,9 @@ export default function DemandStatusSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {[
-                { name: "John Doe", type: "Lease", land: "Plot A-12", date: "15/07/2023", status: "Approved", payment: "Paid" },
-                { name: "Jane Smith", type: "Market", land: "Shop M-05", date: "30/06/2023", status: "Action Needed", payment: "Not Paid" },
-                { name: "Robert Johnson", type: "License", land: "License L-08", date: "10/07/2023", status: "Approved", payment: "Closed" },
-                { name: "Michael Wilson", type: "Building", land: "Building B-03", date: "25/07/2023", status: "Approved", payment: "Not Paid" },
-              ].map((row, idx) => (
+              {demandRows.map((demandRow, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-[#0b1f3b]">{row.name}</td>
+                  <td className="px-6 py-4 font-bold text-[#0b1f3b]">{demandRow?.name}</td>
                   <td className="px-6 py-4 text-slate-600">{row.type}</td>
                   <td className="px-6 py-4 text-slate-600 font-medium">{row.land}</td>
                   <td className="px-6 py-4 text-center text-slate-500 font-medium">{row.date}</td>

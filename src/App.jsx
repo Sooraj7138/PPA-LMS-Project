@@ -22,7 +22,9 @@ export default function App() {
   const tabRefs = useRef([]);
   const [lesseeData, setlesseeData] = useState([]);
   const [landData, setlandData] = useState([]);
-  const [allData, setAllData] = useState({ lesseeData: [], landData: [] })
+  const [eoiData, seteoiData] = useState([]);
+  const [demandNotes, setdemandNotes] = useState([]);
+  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] })
   const [managerPage, setManagerPage] = useState("generate-demand");
   const [error, setError] = useState("");
   const [names, setNames] = useState([])
@@ -61,20 +63,28 @@ export default function App() {
     Promise.all([
       fetchJson("http://localhost:5000/api/LesseeFullView"),
       fetchJson("http://localhost:5000/api/LandData"),
+      fetchJson("http://localhost:5000/api/EoiTable"),
+      fetchJson("http://localhost:5000/api/DemandNotes"),
     ])
-      .then(([lessee, land]) => {
+      .then(([lessee, land, eoi, demand]) => {
         const safeLessee = Array.isArray(lessee) ? lessee : [];
         const safeLand = Array.isArray(land) ? land : [];
+        const safeEoi = Array.isArray(eoi) ? eoi : [];
+        const safeDemand = Array.isArray(demand) ? demand : [];
         setlesseeData(safeLessee);
         setlandData(safeLand);
-        setAllData({ lesseeData: safeLessee, landData: safeLand });
-        console.log("both:", { lesseeData: safeLessee, landData: safeLand });
+        seteoiData(safeEoi)
+        setdemandNotes(safeDemand)
+        setAllData({ lesseeData: safeLessee, landData: safeLand, eoiData: safeEoi, demandNotes: safeDemand });
+        // console.log("both:", { lesseeData: safeLessee, landData: safeLand });
       })
       .catch((err) => {
         setError(err.message);
         setlesseeData([]);
         setlandData([]);
-        setAllData({ lesseeData: [], landData: [] });
+        seteoiData([])
+        setdemandNotes([])
+        setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
       });
   }, []);
 

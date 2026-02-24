@@ -4,53 +4,94 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import './style.css'
 import ManagerDashboard from './ManagerDashboard'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const STORAGE_KEYS = {
+  activePage: "lms_active_page",
+  role: "lms_role",
+  authToken: "lms_auth_token",
+  authUser: "lms_auth_user",
+};
+
+function readStoredRole() {
+  if (typeof window === "undefined") return "User";
+  return localStorage.getItem(STORAGE_KEYS.role) || "User";
+}
+
 export default function App() {
-  const STORAGE_KEYS = {
-    activePage: "lms_active_page",
-    role: "lms_role",
-  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [activePage, setActivePage] = useState(() => {
     if (typeof window === "undefined") return "home";
     return localStorage.getItem(STORAGE_KEYS.activePage) || "home";
   });
-  const [role, setRole] = useState(() => {
-    if (typeof window === "undefined") return "User";
-    return localStorage.getItem(STORAGE_KEYS.role) || "User";
+  const [role, setRole] = useState(() => readStoredRole());
+  const [loginForm, setLoginForm] = useState({ username: "", password: "", rememberMe: false });
+  const [loginError, setLoginError] = useState("");
+  const [loginPending, setLoginPending] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [authToken, setAuthToken] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(STORAGE_KEYS.authToken) || sessionStorage.getItem(STORAGE_KEYS.authToken) || "";
+  });
+  const [authUser, setAuthUser] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const storedUser = localStorage.getItem(STORAGE_KEYS.authUser) || sessionStorage.getItem(STORAGE_KEYS.authUser);
+    if (!storedUser) return null;
+    try {
+      return JSON.parse(storedUser);
+    } catch {
+      return null;
+    }
   });
   const usernameRef = useRef(null);
   const tabRefs = useRef([]);
-  const [lesseeData, setlesseeData] = useState([]);
-  const [landData, setlandData] = useState([]);
-  const [eoiData, seteoiData] = useState([]);
-  const [demandNotes, setdemandNotes] = useState([]);
-  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] })
+  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
   const [managerPage, setManagerPage] = useState("generate-demand");
-  const [error, setError] = useState("");
-  const [names, setNames] = useState([])
 
-
-  // useEffect(()=>{
-  //   fetch("http://localhost:5000/api/LesseeFullView")
-  //   .then((res)=>{if(!res.ok) throw new Error(`HTTP $(res.status)`);
-  //     return res.json();
-  //   })
-  //   .then((data)=>setlesseeData(data))
-  //   .catch((err)=>setError(err.message))
-  // }, [])
-
-  // useEffect(()=>{
-  //   fetch("http://localhost:5000/api/LandData")
-  //   .then((res)=>{if(!res.ok) throw new Error(`HTTP $(res.status)`);
-  //     return res.json();
-  //   })
-  //   .then((data)=>setlandData(data))
-  //   .catch((err)=>setError(err.message))
-  // }, [])
 
   useEffect(() => {
+    async function hydrateSession() {
+      if (!authToken) {
+        setSessionReady(true);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        const user = data?.user || null;
+        setAuthUser(user);
+        if (user?.role) setRole(user.role);
+        if (user?.role === "Manager" || user?.role === "Admin") {
+          setActivePage("manager-dashboard");
+        }
+      } catch {
+        setAuthToken("");
+        setAuthUser(null);
+        localStorage.removeItem(STORAGE_KEYS.authToken);
+        sessionStorage.removeItem(STORAGE_KEYS.authToken);
+        localStorage.removeItem(STORAGE_KEYS.authUser);
+        sessionStorage.removeItem(STORAGE_KEYS.authUser);
+      } finally {
+        setSessionReady(true);
+      }
+    }
+    hydrateSession();
+  }, [authToken]);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    const canLoadManagerData = Boolean(authToken) && (role === "Manager" || role === "Admin");
+    if (!canLoadManagerData) {
+      setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
+      return;
+    }
+
     function fetchJson(url) {
-      return fetch(url).then(async (res) => {
+      return fetch(url, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      }).then(async (res) => {
         const data = await res.json();
         if (!res.ok) {
           const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
@@ -61,32 +102,22 @@ export default function App() {
     }
 
     Promise.all([
-      fetchJson("http://localhost:5000/api/LesseeFullView"),
-      fetchJson("http://localhost:5000/api/LandData"),
-      fetchJson("http://localhost:5000/api/EoiTable"),
-      fetchJson("http://localhost:5000/api/DemandNotes"),
+      fetchJson(`${API_BASE}/api/LesseeFullView`),
+      fetchJson(`${API_BASE}/api/LandData`),
+      fetchJson(`${API_BASE}/api/EoiTable`),
+      fetchJson(`${API_BASE}/api/DemandNotes`),
     ])
       .then(([lessee, land, eoi, demand]) => {
         const safeLessee = Array.isArray(lessee) ? lessee : [];
         const safeLand = Array.isArray(land) ? land : [];
         const safeEoi = Array.isArray(eoi) ? eoi : [];
         const safeDemand = Array.isArray(demand) ? demand : [];
-        setlesseeData(safeLessee);
-        setlandData(safeLand);
-        seteoiData(safeEoi)
-        setdemandNotes(safeDemand)
         setAllData({ lesseeData: safeLessee, landData: safeLand, eoiData: safeEoi, demandNotes: safeDemand });
-        // console.log("both:", { lesseeData: safeLessee, landData: safeLand });
       })
-      .catch((err) => {
-        setError(err.message);
-        setlesseeData([]);
-        setlandData([]);
-        seteoiData([])
-        setdemandNotes([])
+      .catch(() => {
         setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
       });
-  }, []);
+  }, [authToken, role, sessionReady]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.activePage, activePage);
@@ -95,6 +126,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.role, role);
   }, [role]);
+
+  useEffect(() => {
+    if (sessionReady && activePage === "manager-dashboard" && !authToken) {
+      setActivePage("login");
+    }
+  }, [activePage, authToken, sessionReady]);
   
 
   // useEffect(() => {
@@ -149,25 +186,70 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleLoginSubmit(e) {
+  async function handleLoginSubmit(e) {
     e.preventDefault();
-    if (role === "Manager") {
-      setManagerPage("generate-demand");
-      setActivePage("manager-dashboard");
-    } else {
-      alert(`${role} Login functionality is being developed.`);
+    setLoginError("");
+    setLoginPending(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: loginForm.username.trim(),
+          password: loginForm.password,
+          role,
+          rememberMe: loginForm.rememberMe,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+      const token = data?.token || "";
+      const user = data?.user || null;
+      if (!token || !user) throw new Error("Invalid login response");
+
+      setAuthToken(token);
+      setAuthUser(user);
+      setRole(user.role || role);
+
+      const targetStorage = loginForm.rememberMe ? localStorage : sessionStorage;
+      const otherStorage = loginForm.rememberMe ? sessionStorage : localStorage;
+      targetStorage.setItem(STORAGE_KEYS.authToken, token);
+      targetStorage.setItem(STORAGE_KEYS.authUser, JSON.stringify(user));
+      otherStorage.removeItem(STORAGE_KEYS.authToken);
+      otherStorage.removeItem(STORAGE_KEYS.authUser);
+
+      setLoginForm({ username: "", password: "", rememberMe: loginForm.rememberMe });
+      if (user.role === "Manager" || user.role === "Admin") {
+        setManagerPage("generate-demand");
+        setActivePage("manager-dashboard");
+      } else {
+        setActivePage("home");
+      }
+    } catch (err) {
+      setLoginError(err.message || "Unable to sign in");
+    } finally {
+      setLoginPending(false);
     }
   }
 
   function onLogout() {
+    setAuthToken("");
+    setAuthUser(null);
+    setLoginError("");
     setManagerPage("generate-demand");
     setActivePage("home");
     setRole("User");
+    localStorage.removeItem(STORAGE_KEYS.authToken);
+    sessionStorage.removeItem(STORAGE_KEYS.authToken);
+    localStorage.removeItem(STORAGE_KEYS.authUser);
+    sessionStorage.removeItem(STORAGE_KEYS.authUser);
   }
 
   function onLoginClick(e) {
     e.preventDefault();
     closeMobileMenu();
+    setLoginError("");
     setActivePage("login");
     window.setTimeout(() => {
       if (usernameRef.current) {
@@ -191,11 +273,20 @@ export default function App() {
     if (nextBtn) nextBtn.focus();
   }
 
+  function onLoginInputChange(e) {
+    const { name, value, type, checked } = e.target;
+    setLoginForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
   const activeTabClasses = "bg-white border border-slate-200 text-slate-900 shadow-sm";
   const roleDetails = roleConfig[role];
+  const isAuthenticated = Boolean(authToken && authUser);
   const isHomePage = activePage === "home";
   const isLoginPage = activePage === "login";
-  const isManagerDashboard = activePage === "manager-dashboard";
+  const isManagerDashboard = activePage === "manager-dashboard" && isAuthenticated && (role === "Manager" || role === "Admin");
   const managerNavItems = [
     { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
     { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },
@@ -331,10 +422,10 @@ export default function App() {
                     <a
                       href="#"
                       id="login-link"
-                      className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || activePage === "manager-dashboard" ? "nav-cta-link-active" : ""}`.trim()}
-                      onClick={activePage === "manager-dashboard" ? (e) => e.preventDefault() : onLoginClick}
+                      className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || isManagerDashboard ? "nav-cta-link-active" : ""}`.trim()}
+                      onClick={isAuthenticated ? (e) => e.preventDefault() : onLoginClick}
                     >
-                      {activePage === "manager-dashboard" ? "Dashboard" : "Land Login"}
+                      {isAuthenticated ? "Authenticated" : "Land Login"}
                     </a>
                   </li>
                 </>
@@ -488,7 +579,10 @@ export default function App() {
                       data-role={item}
                       className={`role-tab-button ${item === role ? activeTabClasses : ""}`.trim()}
                       ref={(el) => (tabRefs.current[idx] = el)}
-                      onClick={() => setRole(item)}
+                      onClick={() => {
+                        setRole(item);
+                        setLoginError("");
+                      }}
                       onKeyDown={(e) => onTabKeyDown(e, idx)}
                     >
                       <img
@@ -533,6 +627,8 @@ export default function App() {
                       aria-required="true"
                       placeholder={roleDetails.placeholder}
                       className="input-username"
+                      value={loginForm.username}
+                      onChange={onLoginInputChange}
                     />
                   </div>
                 </div>
@@ -564,13 +660,22 @@ export default function App() {
                       aria-required="true"
                       placeholder="Enter your password"
                       className="input-password"
+                      value={loginForm.password}
+                      onChange={onLoginInputChange}
                     />
                   </div>
                 </div>
 
                 <div className="form-options-row" id="it7ebf">
                   <label className="remember-me-control" id="igmd9w">
-                    <input type="checkbox" id="remember" name="remember" className="peer remember-me-input" />
+                    <input
+                      type="checkbox"
+                      id="remember"
+                      name="rememberMe"
+                      checked={loginForm.rememberMe}
+                      onChange={onLoginInputChange}
+                      className="peer remember-me-input"
+                    />
                     <span
                       aria-hidden="true"
                       className="peer-focus:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-checked:bg-blue-700 peer-checked:border-blue-700 custom-checkbox"
@@ -592,9 +697,20 @@ export default function App() {
                   </a>
                 </div>
 
-                <button type="submit" className="submit-button bg-[#0b1f3b] text-white rounded-lg" id="ivn4o3">
-                  Sign in to Portal
+                <button
+                  type="submit"
+                  disabled={loginPending}
+                  className="submit-button bg-[#0b1f3b] text-white rounded-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                  id="ivn4o3"
+                >
+                  {loginPending ? "Signing in..." : "Sign in to Portal"}
                 </button>
+
+                {loginError && (
+                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2" role="alert">
+                    {loginError}
+                  </div>
+                )}
 
                 <div className="divider-row" id="i0iuv7">
                   <div className="divider-line" id="i30nrj"></div>
@@ -619,7 +735,7 @@ export default function App() {
           </section>
         )}
         
-        {activePage === "manager-dashboard" && (
+        {isManagerDashboard && (
           <ManagerDashboard allData={allData} managerPage={managerPage} />
         )}
       </main>

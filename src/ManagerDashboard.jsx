@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import GenerateDemandSection from './manager/GenerateDemandSection'
 import MasterLandDataSection from './manager/MasterLandDataSection'
 import UserDataSection from './manager/UserDataSection'
-import DemandStatusSection from './manager/DemandStatusSection'
+import DemandStatusSection from './Manager/DemandStatusSection'
 import UserEoiSection from './manager/UserEoiSection'
 import { formatDateOnly, normalizeLandType } from './manager/utils'
 
@@ -29,7 +29,7 @@ export default function ManagerDashboard({ allData, managerPage }) {
           <MasterLandDataSection landRows={landRows} normalizeLandType={normalizeLandType} />
         )}
         {managerPage === "user-data" && <UserDataSection lesseeRows={lesseeRows} landRows={landRows} />}
-        {managerPage === "demand-status" && <DemandStatusSection demandRows={demandRows} />}
+        {managerPage === "demand-status" && <DemandStatusSection lesseeRows={lesseeRows} landRows={landRows} demandRows={demandRows} formatDateOnly={formatDateOnly} />}
         {managerPage === "user-eoi" && <UserEoiSection eoiRows={eoiRows} formatDateOnly={formatDateOnly} />}
       </div>
     </div>

@@ -23,5 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
+.env
 .zencoder
 .zenflow
+.git.zip

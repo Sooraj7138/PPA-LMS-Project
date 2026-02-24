@@ -20,8 +20,8 @@ export default function ManagerDashboard({ allData, managerPage }) {
   }, [allData, lesseeRows.length, landRows.length]);
 
   return (
-    <div className="manager-dashboard-layout flex flex-col gap-6">
-      <div className="manager-dashboard-content min-w-0">
+    <div className="dashboard-layout flex flex-col gap-6">
+      <div className="dashboard-content min-w-0">
         {managerPage === "generate-demand" && (
           <GenerateDemandSection lesseeRows={lesseeRows} landRows={landRows} formatDateOnly={formatDateOnly} />
         )}

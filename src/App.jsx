@@ -3,6 +3,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import './style.css'
 import ManagerDashboard from './ManagerDashboard'
+import UserDashboard from './UserDashboard'
+
 
 export default function App() {
   const STORAGE_KEYS = {
@@ -26,6 +28,7 @@ export default function App() {
   const [demandNotes, setdemandNotes] = useState([]);
   const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] })
   const [managerPage, setManagerPage] = useState("generate-demand");
+  const [userPage, setUserPage] = useState("home-page");
   const [error, setError] = useState("");
   const [names, setNames] = useState([])
 
@@ -48,53 +51,53 @@ export default function App() {
   //   .catch((err)=>setError(err.message))
   // }, [])
 
-  useEffect(() => {
-    function fetchJson(url) {
-      return fetch(url).then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) {
-          const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
-          throw new Error(msg);
-        }
-        return data;
-      });
-    }
+  // useEffect(() => {
+  //   function fetchJson(url) {
+  //     return fetch(url).then(async (res) => {
+  //       const data = await res.json();
+  //       if (!res.ok) {
+  //         const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
+  //         throw new Error(msg);
+  //       }
+  //       return data;
+  //     });
+  //   }
 
-    Promise.all([
-      fetchJson("http://localhost:5000/api/LesseeFullView"),
-      fetchJson("http://localhost:5000/api/LandData"),
-      fetchJson("http://localhost:5000/api/EoiTable"),
-      fetchJson("http://localhost:5000/api/DemandNotes"),
-    ])
-      .then(([lessee, land, eoi, demand]) => {
-        const safeLessee = Array.isArray(lessee) ? lessee : [];
-        const safeLand = Array.isArray(land) ? land : [];
-        const safeEoi = Array.isArray(eoi) ? eoi : [];
-        const safeDemand = Array.isArray(demand) ? demand : [];
-        setlesseeData(safeLessee);
-        setlandData(safeLand);
-        seteoiData(safeEoi)
-        setdemandNotes(safeDemand)
-        setAllData({ lesseeData: safeLessee, landData: safeLand, eoiData: safeEoi, demandNotes: safeDemand });
-        // console.log("both:", { lesseeData: safeLessee, landData: safeLand });
-      })
-      .catch((err) => {
-        setError(err.message);
-        setlesseeData([]);
-        setlandData([]);
-        seteoiData([])
-        setdemandNotes([])
-        setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
-      });
-  }, []);
+  //   Promise.all([
+  //     fetchJson("http://localhost:5000/api/LesseeFullView"),
+  //     fetchJson("http://localhost:5000/api/LandData"),
+  //     fetchJson("http://localhost:5000/api/EoiTable"),
+  //     fetchJson("http://localhost:5000/api/DemandNotes"),
+  //   ])
+  //     .then(([lessee, land, eoi, demand]) => {
+  //       const safeLessee = Array.isArray(lessee) ? lessee : [];
+  //       const safeLand = Array.isArray(land) ? land : [];
+  //       const safeEoi = Array.isArray(eoi) ? eoi : [];
+  //       const safeDemand = Array.isArray(demand) ? demand : [];
+  //       setlesseeData(safeLessee);
+  //       setlandData(safeLand);
+  //       seteoiData(safeEoi)
+  //       setdemandNotes(safeDemand)
+  //       setAllData({ lesseeData: safeLessee, landData: safeLand, eoiData: safeEoi, demandNotes: safeDemand });
+  //       // console.log("both:", { lesseeData: safeLessee, landData: safeLand });
+  //     })
+  //     .catch((err) => {
+  //       setError(err.message);
+  //       setlesseeData([]);
+  //       setlandData([]);
+  //       seteoiData([])
+  //       setdemandNotes([])
+  //       setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
+  //     });
+  // }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.activePage, activePage);
-  }, [activePage]);
+  // useEffect(() => {
+  //   localStorage.setItem(STORAGE_KEYS.activePage, activePage);
+  // }, [activePage]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.role, role);
-  }, [role]);
+  // useEffect(() => {
+  //   localStorage.setItem(STORAGE_KEYS.role, role);
+  // }, [role]);
   
 
   // useEffect(() => {
@@ -149,15 +152,33 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleLoginSubmit(e) {
-    e.preventDefault();
-    if (role === "Manager") {
-      setManagerPage("generate-demand");
-      setActivePage("manager-dashboard");
-    } else {
-      alert(`${role} Login functionality is being developed.`);
-    }
+function handleLoginSubmit(e) {
+  e.preventDefault();
+
+  const username = e.target.username.value;
+  const password = e.target.password.value;
+
+  const foundUser = users.find(
+    (u) => u.username === username && u.password === password
+  );
+
+  if (!foundUser) {
+    alert("Invalid credentials");
+    return;
   }
+
+  setRole(foundUser.role);
+
+  if (foundUser.role === "Manager") {
+    setManagerPage("generate-demand");
+    setActivePage("manager-dashboard");
+  } else if (foundUser.role === "User") {
+    setUserPage("user-data");
+    setActivePage("user-dashboard");
+  } else if (foundUser.role === "Admin") {
+    alert("Admin dashboard coming soon");
+  }
+}
 
   function onLogout() {
     setManagerPage("generate-demand");
@@ -196,6 +217,8 @@ export default function App() {
   const isHomePage = activePage === "home";
   const isLoginPage = activePage === "login";
   const isManagerDashboard = activePage === "manager-dashboard";
+  const isUserDashboard = activePage === "user-dashboard";
+  const isDashboard =activePage === "manager-dashboard" || activePage === "user-dashboard";
   const managerNavItems = [
     { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
     { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },
@@ -203,10 +226,21 @@ export default function App() {
     { id: "demand-status", label: "Status of Demand Note", icon: "lucide-check-square" },
     { id: "user-eoi", label: "View User's EOI", icon: "lucide-handshake" },
   ];
+  const userNavItems =[
+    { id: "user-data", label: "Home", icon: "lucide-map-pin" },
+    { id: "view-profile", label: "View Profile", icon: "lucide-users" },
+    { id: "Eoi-map", label: "EOI Map", icon: "lucide-check-square" },
+  ];
+  const users = [
+  { username: "user", password: "user", role: "User" },
+  { username: "manager", password: "manager", role: "Manager" },
+  { username: "admin", password: "admin", role: "Admin" },
+];
 
   return (
-    <div className={`body-container bg-[#f5f7fa] text-[#0b1f3b] text-base leading-relaxed ${isManagerDashboard ? "manager-dashboard-active" : ""}`.trim()}>
-      <header className="header-container pb-4" id="i02u8">
+<div
+  className={`body-container bg-[#f5f7fa] text-[#0b1f3b] text-base leading-relaxed ${isDashboard ? "dashboard-active" : ""}`.trim()}>      
+  <header className="header-container pb-4" id="i02u8">
         <div className="gov-accent-strip" aria-hidden="true"></div>
         <div className="header-bar" id="imhzx">
           <div className="header-brand-group" id="i2x59">
@@ -248,44 +282,56 @@ export default function App() {
             </button>
             <ul
               id="primary-nav-links"
-              className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:flex-row md:items-center md:gap-2 ${isManagerDashboard ? "md:flex-1" : "md:w-auto"}`}
+              className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:flex-row md:items-center md:gap-2 ${isDashboard ? "md:flex-1" : "md:w-auto"}`}
             >
-              {isManagerDashboard ? (
-                <>
-                  {managerNavItems.map((item) => (
-                    <li key={item.id}>
+              {isDashboard ? (
+                  <>
+                    {(role === "Manager" ? managerNavItems : userNavItems).map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (role === "Manager") {
+                              setManagerPage(item.id);
+                            } else {
+                              setUserPage(item.id);
+                            }
+                          }}
+                          className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                            (role === "Manager"
+                              ? managerPage === item.id
+                              : userPage === item.id)
+                              ? "bg-white text-[#0b1f3b]"
+                              : "text-white hover:bg-white/10"
+                          }`}
+                        >
+                          <img
+                            src={`https://api.iconify.design/${item.icon}.svg?color=${
+                              (role === "Manager"
+                                ? managerPage === item.id
+                                : userPage === item.id)
+                                ? "%230b1f3b"
+                                : "white"
+                            }`}
+                            alt=""
+                            className="w-4 h-4 mr-2"
+                          />
+                          {item.label}
+                        </button>
+                      </li>
+                    ))}
+
+                    <li className="md:ml-auto">
                       <button
                         type="button"
-                        onClick={() => setManagerPage(item.id)}
-                        className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                          managerPage === item.id ? "bg-white text-[#0b1f3b]" : "text-white hover:bg-white/10"
-                        }`}
+                        onClick={onLogout}
+                        className="inline-flex items-center rounded-md px-3 py-2 text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition-colors"
                       >
-                        <img
-                          src={`https://api.iconify.design/${item.icon}.svg?color=${managerPage === item.id ? "%230b1f3b" : "white"}`}
-                          alt=""
-                          className="w-4 h-4 mr-2"
-                        />
-                        {item.label}
+                        Sign Out
                       </button>
                     </li>
-                  ))}
-                  <li className="md:ml-auto">
-                    <button
-                      type="button"
-                      onClick={onLogout}
-                      className="inline-flex items-center rounded-md px-3 py-2 text-sm font-bold bg-red-600 text-white hover:bg-red-500 active:bg-red-700 transition-colors shadow-sm ring-1 ring-red-400/50"
-                    >
-                      <img
-                        src="https://api.iconify.design/lucide-log-out.svg?color=white"
-                        alt=""
-                        className="w-4 h-4 mr-2"
-                      />
-                      Sign Out
-                    </button>
-                  </li>
-                </>
-              ) : (
+                  </>
+                ) : (
                 <>
                   <li>
                     <a
@@ -344,7 +390,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main className={`main-content ${activePage !== "home" ? "max-w-[72rem]" : "max-w-[90rem]"} ${isManagerDashboard ? "main-content-wide" : ""}`.trim()} id="ithhf">
+      <main className={`main-content ${activePage !== "home" ? "max-w-[72rem]" : "max-w-[90rem]"} ${isDashboard ? "main-content-wide" : ""}`.trim()} id="ithhf">
         {activePage === "home" && (
           <section className="home-page-section" id="home-page">
             <div className="home-showcase-card">
@@ -619,9 +665,14 @@ export default function App() {
           </section>
         )}
         
-        {activePage === "manager-dashboard" && (
-          <ManagerDashboard allData={allData} managerPage={managerPage} />
-        )}
+          {activePage === "manager-dashboard" && (
+            <ManagerDashboard allData={allData} managerPage={managerPage} />
+          )}
+        {
+          activePage === "user-dashboard" && (
+            <UserDashboard allData={allData} userPage={userPage} />
+          )
+        }
       </main>
 
       <footer className="footer-container" id="i51w3p">

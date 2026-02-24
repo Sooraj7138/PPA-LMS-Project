@@ -601,11 +601,11 @@ video {
     max-width: 80rem;
 }
 
-.body-container.manager-dashboard-active::before {
+.body-container.dashboard-active::before {
     filter: saturate(1.08) contrast(1.04);
 }
 
-.body-container.manager-dashboard-active::after {
+.body-container.dashboard-active::after {
     background:
         linear-gradient(
             180deg,
@@ -623,7 +623,7 @@ video {
         );
 }
 
-.manager-dashboard-layout {
+.dashboard-layout {
     position: relative;
     padding: 1rem;
     min-height: 76vh;
@@ -639,7 +639,7 @@ video {
     backdrop-filter: blur(2px);
 }
 
-.manager-dashboard-layout::before {
+.dashboard-layout::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -650,11 +650,11 @@ video {
         radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--gjs-t-color-accent) 12%, transparent) 0%, transparent 28%);
 }
 
-.manager-dashboard-content > div {
+.dashboard-content > div {
     animation: managerFade 220ms ease-out;
 }
 
-.manager-dashboard-content {
+.dashboard-content {
     min-height: 68vh;
 }
 
@@ -1457,8 +1457,8 @@ video {
         align-items: flex-start;
     }
 
-    .manager-dashboard-layout,
-    .manager-dashboard-content {
+    .dashboard-layout,
+    .dashboard-content {
         min-height: auto;
     }
 }

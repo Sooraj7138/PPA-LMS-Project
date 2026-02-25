@@ -5,6 +5,7 @@ import './style.css'
 import ManagerDashboard from './ManagerDashboard'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const EMPTY_MANAGER_DATA = { lesseeData: [], landData: [], eoiData: [], demandNotes: [] };
 const STORAGE_KEYS = {
   activePage: "lms_active_page",
   role: "lms_role",
@@ -46,6 +47,7 @@ export default function App() {
   const tabRefs = useRef([]);
   const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
   const [managerPage, setManagerPage] = useState("generate-demand");
+  const managerDataRequestsRef = useRef(new Map());
 
 
   useEffect(() => {
@@ -84,7 +86,8 @@ export default function App() {
     if (!sessionReady) return;
     const canLoadManagerData = Boolean(authToken) && (role === "Manager" || role === "Admin");
     if (!canLoadManagerData) {
-      setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
+      setAllData(EMPTY_MANAGER_DATA);
+      managerDataRequestsRef.current.clear();
       return;
     }
 
@@ -101,22 +104,42 @@ export default function App() {
       });
     }
 
-    Promise.all([
-      fetchJson(`${API_BASE}/api/LesseeFullView`),
-      fetchJson(`${API_BASE}/api/LandData`),
-      fetchJson(`${API_BASE}/api/EoiTable`),
-      fetchJson(`${API_BASE}/api/DemandNotes`),
-    ])
-      .then(([lessee, land, eoi, demand]) => {
-        const safeLessee = Array.isArray(lessee) ? lessee : [];
-        const safeLand = Array.isArray(land) ? land : [];
-        const safeEoi = Array.isArray(eoi) ? eoi : [];
-        const safeDemand = Array.isArray(demand) ? demand : [];
-        setAllData({ lesseeData: safeLessee, landData: safeLand, eoiData: safeEoi, demandNotes: safeDemand });
+    const requestKey = `${API_BASE}|${authToken}`;
+    let requestPromise = managerDataRequestsRef.current.get(requestKey);
+
+    if (!requestPromise) {
+      requestPromise = Promise.all([
+        fetchJson(`${API_BASE}/api/LesseeFullView`),
+        fetchJson(`${API_BASE}/api/LandData`),
+        fetchJson(`${API_BASE}/api/EoiTable`),
+        fetchJson(`${API_BASE}/api/DemandNotes`),
+      ])
+        .then(([lessee, land, eoi, demand]) => ({
+          lesseeData: Array.isArray(lessee) ? lessee : [],
+          landData: Array.isArray(land) ? land : [],
+          eoiData: Array.isArray(eoi) ? eoi : [],
+          demandNotes: Array.isArray(demand) ? demand : [],
+        }))
+        .catch((error) => {
+          managerDataRequestsRef.current.delete(requestKey);
+          throw error;
+        });
+
+      managerDataRequestsRef.current.set(requestKey, requestPromise);
+    }
+
+    let cancelled = false;
+    requestPromise
+      .then((payload) => {
+        if (!cancelled) setAllData(payload);
       })
       .catch(() => {
-        setAllData({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
+        if (!cancelled) setAllData(EMPTY_MANAGER_DATA);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [authToken, role, sessionReady]);
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import MasterLandDataSection from './manager/MasterLandDataSection'
 import UserDataSection from './manager/UserDataSection'
 import DemandStatusSection from './Manager/DemandStatusSection'
 import UserEoiSection from './manager/UserEoiSection'
-import { formatDateOnly, normalizeLandType } from './manager/utils'
+import { formatDateOnly, normalizeLandType } from './utils'
 
 export default function ManagerDashboard({ allData, managerPage }) {
   const landRows = Array.isArray(allData?.landData) ? allData.landData : [];

@@ -421,6 +421,33 @@ app.get("/api/DemandNotes", authenticateToken, authorizeRoles("Manager", "Admin"
   }
 });
 
+app.get("/api/UserData", authenticateToken, authorizeRoles("Manager", "Admin", "User"), async (req, res) => {
+  try {
+    const p = await getPool();
+    let result;
+    if (req.user?.role === "User") {
+      // User accounts should see only their own rows.
+      result = await p
+        .request()
+        .input("authUserId", sql.Int, Number(req.user.userId) || null)
+        .input("username", sql.NVarChar(120), String(req.user.username || ""))
+        .query(`
+          SELECT *
+          FROM UserData
+          WHERE UserID = @authUserId
+             OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@username)))
+             OR LOWER(LTRIM(RTRIM(LesseeID))) = LOWER(LTRIM(RTRIM(@username)))
+        `);
+    } else {
+      result = await p.request().query("SELECT * FROM UserData");
+    }
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB query failed" });
+  }
+});
+
 // app.get("/api/lessee/:id", async (req, res) => {
 //   try {
 //     const p = await getPool();

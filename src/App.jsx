@@ -3,9 +3,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import './style.css'
 import ManagerDashboard from './ManagerDashboard'
+import AdminDashboard from './AdminDashboard';
+import UserDashboard from './UserDashboard'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-const EMPTY_MANAGER_DATA = { lesseeData: [], landData: [], eoiData: [], demandNotes: [] };
+const EMPTY_MANAGER_DATA = { lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [] };
 const STORAGE_KEYS = {
   activePage: "lms_active_page",
   role: "lms_role",
@@ -45,10 +47,13 @@ export default function App() {
   });
   const usernameRef = useRef(null);
   const tabRefs = useRef([]);
-  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [] });
+  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [] });
   const [managerPage, setManagerPage] = useState("generate-demand");
+  const [adminPage, setAdminPage] = useState("demand-notes");
   const managerDataRequestsRef = useRef(new Map());
-
+  const [userPage, setUserPage] = useState("home-page");
+  const [error, setError] = useState("");
+  const [names, setNames] = useState([])
 
   useEffect(() => {
     async function hydrateSession() {
@@ -65,8 +70,12 @@ export default function App() {
         const user = data?.user || null;
         setAuthUser(user);
         if (user?.role) setRole(user.role);
-        if (user?.role === "Manager" || user?.role === "Admin") {
+        if (user?.role === "Manager") {
           setActivePage("manager-dashboard");
+        } else if (user?.role === "Admin") {
+          setActivePage("admin-dashboard");
+        } else if (user?.role === "User") {
+          setActivePage("user-dashboard");
         }
       } catch {
         setAuthToken("");
@@ -84,8 +93,8 @@ export default function App() {
 
   useEffect(() => {
     if (!sessionReady) return;
-    const canLoadManagerData = Boolean(authToken) && (role === "Manager" || role === "Admin");
-    if (!canLoadManagerData) {
+    const canLoadDashboardData = Boolean(authToken) && (role === "Manager" || role === "Admin" || role === "User");
+    if (!canLoadDashboardData) {
       setAllData(EMPTY_MANAGER_DATA);
       managerDataRequestsRef.current.clear();
       return;
@@ -104,22 +113,37 @@ export default function App() {
       });
     }
 
-    const requestKey = `${API_BASE}|${authToken}`;
+    const requestKey = `${API_BASE}|${authToken}|${role}`;
     let requestPromise = managerDataRequestsRef.current.get(requestKey);
 
     if (!requestPromise) {
-      requestPromise = Promise.all([
-        fetchJson(`${API_BASE}/api/LesseeFullView`),
-        fetchJson(`${API_BASE}/api/LandData`),
-        fetchJson(`${API_BASE}/api/EoiTable`),
-        fetchJson(`${API_BASE}/api/DemandNotes`),
-      ])
-        .then(([lessee, land, eoi, demand]) => ({
-          lesseeData: Array.isArray(lessee) ? lessee : [],
-          landData: Array.isArray(land) ? land : [],
-          eoiData: Array.isArray(eoi) ? eoi : [],
-          demandNotes: Array.isArray(demand) ? demand : [],
-        }))
+      const endpointMap =
+        role === "User"
+          ? {
+              userData: `${API_BASE}/api/UserData`,
+            }
+          : {
+              lesseeData: `${API_BASE}/api/LesseeFullView`,
+              landData: `${API_BASE}/api/LandData`,
+              eoiData: `${API_BASE}/api/EoiTable`,
+              demandNotes: `${API_BASE}/api/DemandNotes`,
+              userData: `${API_BASE}/api/UserData`,
+            };
+
+      requestPromise = Promise.allSettled(
+        Object.entries(endpointMap).map(([key, url]) =>
+          fetchJson(url).then((data) => [key, data])
+        )
+      )
+        .then((results) => {
+          const payload = { ...EMPTY_MANAGER_DATA };
+          results.forEach((result) => {
+            if (result.status !== "fulfilled") return;
+            const [key, data] = result.value;
+            payload[key] = Array.isArray(data) ? data : [];
+          });
+          return payload;
+        })
         .catch((error) => {
           managerDataRequestsRef.current.delete(requestKey);
           throw error;
@@ -151,7 +175,9 @@ export default function App() {
   }, [role]);
 
   useEffect(() => {
-    if (sessionReady && activePage === "manager-dashboard" && !authToken) {
+    const isProtectedDashboardPage =
+      activePage === "manager-dashboard" || activePage === "admin-dashboard" || activePage === "user-dashboard";
+    if (sessionReady && isProtectedDashboardPage && !authToken) {
       setActivePage("login");
     }
   }, [activePage, authToken, sessionReady]);
@@ -243,9 +269,15 @@ export default function App() {
       otherStorage.removeItem(STORAGE_KEYS.authUser);
 
       setLoginForm({ username: "", password: "", rememberMe: loginForm.rememberMe });
-      if (user.role === "Manager" || user.role === "Admin") {
+      if (user.role === "Manager" ) {
         setManagerPage("generate-demand");
         setActivePage("manager-dashboard");
+      } else if (user.role === "Admin") {
+        setActivePage("admin-dashboard");
+        setAdminPage("demand-notes");
+      } else if (user.role === "User") {
+        setUserPage("user-data");
+        setActivePage("user-dashboard");
       } else {
         setActivePage("home");
       }
@@ -259,6 +291,7 @@ export default function App() {
   function onLogout() {
     setAuthToken("");
     setAuthUser(null);
+    setAdminPage("eoi-data");
     setLoginError("");
     setManagerPage("generate-demand");
     setActivePage("home");
@@ -309,7 +342,18 @@ export default function App() {
   const isAuthenticated = Boolean(authToken && authUser);
   const isHomePage = activePage === "home";
   const isLoginPage = activePage === "login";
-  const isManagerDashboard = activePage === "manager-dashboard" && isAuthenticated && (role === "Manager" || role === "Admin");
+  const isManagerDashboard = activePage === "manager-dashboard" && isAuthenticated && role === "Manager";
+  const isAdminDashboard = activePage === "admin-dashboard" && isAuthenticated && role === "Admin";
+  const isUserDashboard = activePage === "user-dashboard" && isAuthenticated && role === "User";
+  const isDashboardPage = isManagerDashboard || isAdminDashboard || isUserDashboard;
+  const userNavItems =[
+    { id: "user-data", label: "Home", icon: "lucide-map-pin" },
+    { id: "view-profile", label: "View Profile", icon: "lucide-users" },
+    { id: "Eoi-map", label: "EOI Map", icon: "lucide-check-square" },
+  ];
+  const adminNavItems = [
+    { id: "demand-notes", label: "View Demand Notes", icon: "lucide:file-text" },
+    { id: "eoi-data", label: "View EOI Data", icon: "lucide-handshake" },];
   const managerNavItems = [
     { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
     { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },
@@ -319,7 +363,7 @@ export default function App() {
   ];
 
   return (
-    <div className={`body-container bg-[#f5f7fa] text-[#0b1f3b] text-base leading-relaxed ${isManagerDashboard ? "manager-dashboard-active" : ""}`.trim()}>
+    <div className={`body-container bg-[#f5f7fa] text-[#0b1f3b] text-base leading-relaxed ${isManagerDashboard ? "manager-dashboard-active" : ""} ${isAdminDashboard ? "admin-dashboard-active" : ""} ${isUserDashboard ? "user-dashboard-active" : ""}`.trim()}>
       <header className="header-container pb-4" id="i02u8">
         <div className="gov-accent-strip" aria-hidden="true"></div>
         <div className="header-bar" id="imhzx">
@@ -362,8 +406,9 @@ export default function App() {
             </button>
             <ul
               id="primary-nav-links"
-              className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:flex-row md:items-center md:gap-2 ${isManagerDashboard ? "md:flex-1" : "md:w-auto"}`}
-            >
+                 className={`${menuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm font-medium md:flex md:flex-row md:items-center md:gap-2 ${
+                 isDashboardPage ? "md:flex-1" : "md:w-auto"
+                }`.trim()}>
               {isManagerDashboard ? (
                 <>
                   {managerNavItems.map((item) => (
@@ -399,7 +444,89 @@ export default function App() {
                     </button>
                   </li>
                 </>
-              ) : (
+              ) : isAdminDashboard ? (
+                     <>
+                     {adminNavItems.map((item) => (
+                       <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => setAdminPage(item.id)}
+                          className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                            adminPage === item.id ? "bg-white text-[#0b1f3b]" : "text-white hover:bg-white/10"
+                          }`}
+                        >
+                          <img
+                            src={`https://api.iconify.design/${item.icon.replace(":", "/")}.svg?color=${adminPage === item.id ? "%230b1f3b" : "white"}`}
+                            alt=""
+                            className="w-4 h-4 mr-2"
+                          />
+                          {item.label}
+                        </button>
+                      </li>
+                    ))}
+                    <li className="md:ml-auto">
+                      <button
+                        type="button"
+                        onClick={onLogout}
+                        className="inline-flex items-center rounded-md px-3 py-2 text-sm font-bold bg-red-600 text-white hover:bg-red-500 active:bg-red-700 transition-colors shadow-sm ring-1 ring-red-400/50"
+                      >
+                        <img
+                          src="https://api.iconify.design/lucide-log-out.svg?color=white"
+                          alt=""
+                          className="w-4 h-4 mr-2"
+                        />
+                        Sign Out
+                      </button>
+                    </li>
+                  </>
+              ) : isUserDashboard ? (
+                  <>
+                    {(role === "Manager" ? managerNavItems : userNavItems).map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (role === "Manager") {
+                              setManagerPage(item.id);
+                            } else {
+                              setUserPage(item.id);
+                            }
+                          }}
+                          className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                            (role === "Manager"
+                              ? managerPage === item.id
+                              : userPage === item.id)
+                              ? "bg-white text-[#0b1f3b]"
+                              : "text-white hover:bg-white/10"
+                          }`}
+                        >
+                          <img
+                            src={`https://api.iconify.design/${item.icon}.svg?color=${
+                              (role === "Manager"
+                                ? managerPage === item.id
+                                : userPage === item.id)
+                                ? "%230b1f3b"
+                                : "white"
+                            }`}
+                            alt=""
+                            className="w-4 h-4 mr-2"
+                          />
+                          {item.label}
+                        </button>
+                      </li>
+                    ))}
+
+                    <li className="md:ml-auto">
+                      <button
+                        type="button"
+                        onClick={onLogout}
+                        className="inline-flex items-center rounded-md px-3 py-2 text-sm font-bold bg-red-600 text-white hover:bg-red-500 transition-colors"
+                      >
+                        Sign Out
+                      </button>
+                    </li>
+                  </>
+                ) : (
                 <>
                   <li>
                     <a
@@ -445,7 +572,7 @@ export default function App() {
                     <a
                       href="#"
                       id="login-link"
-                      className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || isManagerDashboard ? "nav-cta-link-active" : ""}`.trim()}
+                      className={`nav-cta-link block rounded-md px-3 py-2 hover:bg-white/20 ${isLoginPage || isDashboardPage ? "nav-cta-link-active" : ""}`.trim()}
                       onClick={isAuthenticated ? (e) => e.preventDefault() : onLoginClick}
                     >
                       {isAuthenticated ? "Authenticated" : "Land Login"}
@@ -760,6 +887,12 @@ export default function App() {
         
         {isManagerDashboard && (
           <ManagerDashboard allData={allData} managerPage={managerPage} />
+        )}
+        {isAdminDashboard && (
+          <AdminDashboard allData={allData} adminPage={adminPage} onLogout={onLogout} />
+        )}
+        {isUserDashboard && (
+          <UserDashboard allData={allData} userPage={userPage} />
         )}
       </main>
 

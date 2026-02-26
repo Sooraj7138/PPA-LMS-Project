@@ -14,7 +14,7 @@ export default function UserDashboard({ allData, userPage }) {
         <HomePage paymentRows={paymentRows} formatDateOnly={formatDateOnly} />
         }
         {userPage === "view-profile" &&
-        <ProfilePage />
+        <ProfilePage paymentRows={paymentRows} formatDateOnly={formatDateOnly} />
         }
         {userPage === "Eoi-map" &&
         <MapPage />

@@ -436,7 +436,6 @@ app.get("/api/UserData", authenticateToken, authorizeRoles("Manager", "Admin", "
           FROM UserData
           WHERE UserID = @authUserId
              OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@username)))
-             OR LOWER(LTRIM(RTRIM(LesseeID))) = LOWER(LTRIM(RTRIM(@username)))
         `);
     } else {
       result = await p.request().query("SELECT * FROM UserData");

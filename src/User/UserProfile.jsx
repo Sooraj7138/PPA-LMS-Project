@@ -1,4 +1,4 @@
-export default function UserProfile({ user }) {
+export default function UserProfile({ user, paymentRows, formatDateOnly }) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <h3 className="text-2xl font-bold text-[#0b1f3b]">User Profile</h3>
@@ -19,36 +19,38 @@ export default function UserProfile({ user }) {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <tbody className="divide-y divide-slate-200">
+        {paymentRows.map((paymentRow)=>(
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <tbody className="divide-y divide-slate-200">
 
-              <ProfileRow label="Company Name" value={user?.company} />
-              <ProfileRow label="Type of Organisation" value={user?.orgType} />
-              <ProfileRow label="Authority Name" value={user?.authority} />
-              <ProfileRow label="Email" value={user?.email} />
-              <ProfileRow label="Phone" value={user?.phone} />
-              <ProfileRow label="Permanent Address" value={user?.address} />
-              <ProfileRow label="Allotment Date" value={user?.allotmentDate} />
-              <ProfileRow label="Lease / License / Open Space" value={user?.leaseType} />
-              <ProfileRow label="Area" value={user?.area} />
+                <ProfileRow label="Company Name" value={user?.company} />
+                <ProfileRow label="Type of Organisation" value={paymentRow?.CategoryCode} />
+                <ProfileRow label="Authority Name" value={paymentRow?.authority} />
+                <ProfileRow label="Email" value={paymentRow?.EmailID} />
+                <ProfileRow label="Phone" value={paymentRow?.ContactNo} />
+                <ProfileRow label="Permanent Address" value={paymentRow?.Address} />
+                <ProfileRow label="Allotment Date" value={user?.allotmentDate} />
+                <ProfileRow label="Lease / License / Open Space" value={user?.leaseType} />
+                <ProfileRow label="Area" value={user?.area} />
 
-              <tr>
-                <td className="px-6 py-4 font-semibold bg-slate-50 w-1/3">
-                  Payment Status
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 ring-1 ring-red-600/20">
-                    Not Paid
-                  </span>
-                </td>
-              </tr>
+                <tr>
+                  <td className="px-6 py-4 font-semibold bg-slate-50 w-1/3">
+                    Payment Status
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 ring-1 ring-red-600/20">
+                      Not Paid
+                    </span>
+                  </td>
+                </tr>
 
-              <ProfileRow label="Renewal Done On" value={user?.renewalDate} />
+                <ProfileRow label="Renewal Done On" value={user?.renewalDate} />
 
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     </div>
   );

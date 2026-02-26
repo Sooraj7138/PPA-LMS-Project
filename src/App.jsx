@@ -353,7 +353,9 @@ export default function App() {
   ];
   const adminNavItems = [
     { id: "demand-notes", label: "View Demand Notes", icon: "lucide:file-text" },
-    { id: "eoi-data", label: "View EOI Data", icon: "lucide-handshake" },];
+    { id: "eoi-data", label: "View EOI Data", icon: "lucide-handshake" },
+    { id: "Eoi-map", label: "EOI Map", icon: "lucide-map" },
+  ];
   const managerNavItems = [
     { id: "generate-demand", label: "Generate Demand Note", icon: "lucide-file-plus" },
     { id: "master-land", label: "Master Land Data", icon: "lucide-map-pin" },

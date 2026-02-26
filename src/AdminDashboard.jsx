@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import UserEoiSection from './manager/UserEoiSection';
 import DemandsSection from './Admin/DemandsSection';
+import MapPage from './User/MapPage';
 import { formatDateOnly } from './utils'
 
 export default function AdminDashboard({ allData, adminPage }) {
@@ -26,6 +27,8 @@ export default function AdminDashboard({ allData, adminPage }) {
             formatDateOnly={formatDateOnly}
           />
         )}
+
+        {adminPage === "Eoi-map" && <MapPage />}
       </div>
     </div>
   );

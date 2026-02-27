@@ -46,7 +46,7 @@ export default function UserDataSection({ lesseeRows, landRows }) {
                 <th className="px-6 py-4">Consumer Name</th>
                 <th className="px-6 py-4">Address</th>
                 <th className="px-6 py-4">Mobile Number</th>
-                <th className="px-6 py-4">Allotted Land</th>
+                <th className="px-6 py-4">Allotted Land</th>  
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>

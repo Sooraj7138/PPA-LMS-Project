@@ -7,7 +7,7 @@ import AdminDashboard from './AdminDashboard';
 import UserDashboard from './UserDashboard'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-const EMPTY_MANAGER_DATA = { lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [] };
+const EMPTY_MANAGER_DATA = { lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [], userProfile: [] };
 const STORAGE_KEYS = {
   activePage: "lms_active_page",
   role: "lms_role",
@@ -47,7 +47,7 @@ export default function App() {
   });
   const usernameRef = useRef(null);
   const tabRefs = useRef([]);
-  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [] });
+  const [allData, setAllData] = useState({ lesseeData: [], landData: [], eoiData: [], demandNotes: [], userData: [], userProfile: [] });
   const [managerPage, setManagerPage] = useState("generate-demand");
   const [adminPage, setAdminPage] = useState("demand-notes");
   const managerDataRequestsRef = useRef(new Map());
@@ -121,6 +121,7 @@ export default function App() {
         role === "User"
           ? {
               userData: `${API_BASE}/api/UserData`,
+              userProfile: `${API_BASE}/api/UserProfile`
             }
           : {
               lesseeData: `${API_BASE}/api/LesseeFullView`,
@@ -128,6 +129,7 @@ export default function App() {
               eoiData: `${API_BASE}/api/EoiTable`,
               demandNotes: `${API_BASE}/api/DemandNotes`,
               userData: `${API_BASE}/api/UserData`,
+              userProfile: `${API_BASE}/api/UserProfile`
             };
 
       requestPromise = Promise.allSettled(

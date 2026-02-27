@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 
-export default function UserProfile({ allData, formatDateOnly }) {
+export default function UserProfile({ userProf, formatDateOnly }) {
   const getValue = (row, keys) => {
     for (const key of keys) {
       const value = row?.[key];
@@ -34,21 +34,21 @@ export default function UserProfile({ allData, formatDateOnly }) {
           </div>
           <table className="w-full text-sm border-collapse">
             <tbody className="divide-y divide-slate-200">
-              {allData.map((data, idx) => {
+              {userProf.map((data, idx) => {
                 const paymentRow = data?.userData || {};
                 const Lessee = data?.Lessee || {};
                 
                 return (
                 <Fragment key={idx}>
-                  <ProfileRow label="Company Name" value={getValue(paymentRow, ["company", "Company", "CompanyName"])} />
-                  <ProfileRow label="Type of Organisation" value={getValue(Lessee, ["CategoryCode"])} />
-                  <ProfileRow label="Authority Name" value={getValue(paymentRow, ["Username"])} />
-                  <ProfileRow label="Email" value={getValue(paymentRow, ["EmailID"])} />
-                  <ProfileRow label="Phone" value={getValue(paymentRow, ["ContactNo"])} />
-                  <ProfileRow label="Permanent Address" value={getValue(paymentRow, ["Address"])} />
-                  <ProfileRow label="Allotment Date" value={getDateValue(paymentRow, ["allotmentDate", "AllotmentDate"])} />
-                  <ProfileRow label="Lease / License / Open Space" value={getValue(Lessee, ["LandType"])} />
-                  <ProfileRow label="Area" value={getValue(paymentRow, ["area", "Area"])} />
+                  <ProfileRow label="Company Name" value={getValue(data, ["CompanyName"])} />
+                  <ProfileRow label="Type of Organisation" value={getValue(data, ["OrganisationType"])} />
+                  <ProfileRow label="Authority Name" value={getValue(data, ["AuthorityName"])} />
+                  <ProfileRow label="Email" value={getValue(data, ["EmailId"])} />
+                  <ProfileRow label="Phone" value={getValue(data, ["Phone"])} />
+                  <ProfileRow label="Permanent Address" value={getValue(data, ["Address"])} />
+                  {/* <ProfileRow label="Allotment Date" value={getDateValue(data, ["allotmentDate", "AllotmentDate"])} />
+                  <ProfileRow label="Lease / License / Open Space" value={getValue(data, ["LandType"])} />
+                  <ProfileRow label="Area" value={getValue(data, ["area", "Area"])} />
 
                   <tr>
                     <td className="px-6 py-4 font-semibold bg-slate-50 w-1/3">
@@ -61,7 +61,7 @@ export default function UserProfile({ allData, formatDateOnly }) {
                     </td>
                   </tr>
 
-                  <ProfileRow label="Renewal Done On" value={getDateValue(paymentRow, ["renewalDate", "RenewalDate"])} />
+                  <ProfileRow label="Renewal Done On" value={getDateValue(paymentRow, ["renewalDate", "RenewalDate"])} /> */}
                 </Fragment>
                 );})}
             </tbody>

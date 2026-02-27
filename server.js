@@ -421,6 +421,19 @@ app.get("/api/DemandNotes", authenticateToken, authorizeRoles("Manager", "Admin"
   }
 });
 
+app.get("/api/UserProfile", authenticateToken, authorizeRoles("Manager", "Admin", "User"), async (req, res) => {
+  try {
+    const p = await getPool();
+    const result = await p.request()
+              .input("username", sql.NVarChar(120), String(req.user.username || ""))
+              .query("SELECT CompanyName, OrganisationType, AuthorityName, EmailId, Address, Phone FROM UserProfile WHERE AuthorityName = @username");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB query failed" });
+  }
+});
+
 app.get("/api/UserData", authenticateToken, authorizeRoles("Manager", "Admin", "User"), async (req, res) => {
   try {
     const p = await getPool();
@@ -446,6 +459,25 @@ app.get("/api/UserData", authenticateToken, authorizeRoles("Manager", "Admin", "
     res.status(500).json({ error: "DB query failed" });
   }
 });
+
+app.get("/api/UserData/:userId", authenticateToken, async (req, res) => {
+  try {
+    const p = await getPool();
+    const result = await p.request()
+      .input("userId", sql.Int, Number(req.params.userId))
+      .query(`
+        SELECT *
+        FROM LesseeFullView
+        WHERE UserID = @userId
+      `);
+    res.json(result.recordset); // not recordset[0]
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB query failed" });
+  }
+});
+
+
 
 // app.get("/api/lessee/:id", async (req, res) => {
 //   try {

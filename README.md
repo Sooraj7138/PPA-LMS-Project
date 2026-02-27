@@ -4,15 +4,84 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 Currently, two official plugins are available:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## PPA-LMS-Project
 
-## React Compiler
+PPA-LMS-Project is a small full-stack application that provides dashboards and mapping for an LMS-style land mapping workflow. It includes a Vite + React frontend and a lightweight Node/Express backend API. The app supports three roles: Admin, Manager, and User, and uses Leaflet for map views and MSSQL for data storage.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+Key features
 
-Note: This will impact Vite dev & build performances.
+- Admin, Manager and User dashboards
+- Map visualization using Leaflet
+- Simple Node/Express API for authentication and data access
+- Utilities for password hashing and JWT-based auth
 
-## Expanding the ESLint configuration
+Tech stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Frontend: React, Vite
+- Backend: Node.js, Express
+- Database: Microsoft SQL Server (via `mssql`)
+- Map: Leaflet + react-leaflet
+
+Quick start
+
+Prerequisites: Node.js (v14+ recommended) and an MSSQL instance if you want to connect to a database.
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the frontend dev server:
+
+```bash
+npm run dev
+```
+
+Start the backend API (in a separate terminal):
+
+```bash
+npm run dev:api
+```
+
+Build for production:
+
+```bash
+npm run build
+npm run preview
+```
+
+Helpful scripts:
+
+- `npm run dev` — starts Vite dev server (frontend)
+- `npm run dev:api` — starts the Node/Express API (`server.js`)
+- `npm run build` — builds the frontend for production
+- `npm run preview` — serves the built frontend locally
+- `npm run auth:hash` — helper to hash passwords (`scripts/hash-password.mjs`)
+
+Environment
+
+This project uses `dotenv`. Create a `.env` at the project root with the required values for your setup. Typical variables the app expects include:
+
+- `PORT` — API port
+- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE` — MSSQL connection
+- `JWT_SECRET` — secret for signing JSON Web Tokens
+
+Project structure (high level):
+
+- [src/main.jsx](src/main.jsx) — app entry
+- [src/App.jsx](src/App.jsx) — top-level routes and layout
+- [src/utils.js](src/utils.js) — shared helpers
+- [src/Admin](src/Admin) — Admin UI components (DemandsSection, UserDataSection, etc.)
+- [src/Manager](src/Manager) — Manager UI components
+- [src/User](src/User) — User-facing pages (MapPage, HomePage, UserProfile)
+- [server.js](server.js) — simple Express API used in development
+- [scripts/hash-password.mjs](scripts/hash-password.mjs) — password hashing utility
+- [package.json](package.json) — scripts & dependencies
+
+Development notes:
+
+- Frontend routing and role-based views live in `src/*` — look at `AdminDashboard.jsx`, `ManagerDashboard.jsx`, and `UserDashboard.jsx` for role entry points.
+- Map functionality is implemented in `src/User/MapPage.jsx` using `react-leaflet`.
+- The backend uses `express`, `jsonwebtoken`, and `mssql` — adjust `.env` and connection strings before running against a real database.
+

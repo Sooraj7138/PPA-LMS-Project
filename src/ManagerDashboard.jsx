@@ -6,7 +6,7 @@ import DemandStatusSection from './Manager/DemandStatusSection'
 import UserEoiSection from './manager/UserEoiSection'
 import { formatDateOnly, normalizeLandType } from './utils'
 
-export default function ManagerDashboard({ allData, managerPage }) {
+export default function ManagerDashboard({ allData, managerPage, authToken, onDemandChanged }) {
   const landRows = Array.isArray(allData?.landData) ? allData.landData : [];
   const lesseeRows = Array.isArray(allData?.lesseeData) ? allData.lesseeData : [];
   const eoiRows = Array.isArray(allData?.eoiData) ? allData.eoiData : [];
@@ -23,7 +23,13 @@ export default function ManagerDashboard({ allData, managerPage }) {
     <div className="manager-dashboard-layout flex flex-col gap-6">
       <div className="manager-dashboard-content min-w-0">
         {managerPage === "generate-demand" && (
-          <GenerateDemandSection lesseeRows={lesseeRows} landRows={landRows} formatDateOnly={formatDateOnly} />
+          <GenerateDemandSection
+            lesseeRows={lesseeRows}
+            landRows={landRows}
+            formatDateOnly={formatDateOnly}
+            authToken={authToken}
+            onDemandGenerated={onDemandChanged}
+          />
         )}
         {managerPage === "master-land" && (
           <MasterLandDataSection landRows={landRows} normalizeLandType={normalizeLandType} />

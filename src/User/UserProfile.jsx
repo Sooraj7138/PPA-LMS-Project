@@ -1,20 +1,10 @@
 import { Fragment } from "react";
 
-export default function UserProfile({ userProf, formatDateOnly }) {
+export default function UserProfile({ profileRows }) {
   const getValue = (row, keys) => {
     for (const key of keys) {
       const value = row?.[key];
       if (value !== undefined && value !== null && value !== "") return value;
-    }
-    return "-";
-  };
-
-  const getDateValue = (row, keys) => {
-    for (const key of keys) {
-      const value = row?.[key];
-      if (value !== undefined && value !== null && value !== "") {
-        return formatDateOnly(value);
-      }
     }
     return "-";
   };
@@ -34,10 +24,7 @@ export default function UserProfile({ userProf, formatDateOnly }) {
           </div>
           <table className="w-full text-sm border-collapse">
             <tbody className="divide-y divide-slate-200">
-              {userProf.map((data, idx) => {
-                const paymentRow = data?.userData || {};
-                const Lessee = data?.Lessee || {};
-                
+              {profileRows.map((data, idx) => {
                 return (
                 <Fragment key={idx}>
                   <ProfileRow label="Company Name" value={getValue(data, ["CompanyName"])} />

@@ -51,6 +51,7 @@ export default function App() {
   const [managerPage, setManagerPage] = useState("generate-demand");
   const [adminPage, setAdminPage] = useState("demand-notes");
   const managerDataRequestsRef = useRef(new Map());
+  const [dataRefreshTick, setDataRefreshTick] = useState(0);
   const [userPage, setUserPage] = useState("home-page");
   const [error, setError] = useState("");
   const [names, setNames] = useState([])
@@ -113,7 +114,7 @@ export default function App() {
       });
     }
 
-    const requestKey = `${API_BASE}|${authToken}|${role}`;
+    const requestKey = `${API_BASE}|${authToken}|${role}|${dataRefreshTick}`;
     let requestPromise = managerDataRequestsRef.current.get(requestKey);
 
     if (!requestPromise) {
@@ -166,7 +167,12 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, role, sessionReady]);
+  }, [authToken, role, sessionReady, dataRefreshTick]);
+
+  function refreshDashboardData() {
+    managerDataRequestsRef.current.clear();
+    setDataRefreshTick((prev) => prev + 1);
+  }
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.activePage, activePage);
@@ -890,13 +896,13 @@ export default function App() {
         )}
         
         {isManagerDashboard && (
-          <ManagerDashboard allData={allData} managerPage={managerPage} />
+          <ManagerDashboard allData={allData} managerPage={managerPage} authToken={authToken} onDemandChanged={refreshDashboardData} />
         )}
         {isAdminDashboard && (
-          <AdminDashboard allData={allData} adminPage={adminPage} onLogout={onLogout} />
+          <AdminDashboard allData={allData} adminPage={adminPage} onLogout={onLogout} authToken={authToken} onDemandChanged={refreshDashboardData} />
         )}
         {isUserDashboard && (
-          <UserDashboard allData={allData} userPage={userPage} />
+          <UserDashboard allData={allData} userPage={userPage} authToken={authToken} />
         )}
       </main>
 

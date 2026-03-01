@@ -20,34 +20,42 @@ export default function DemandStatusSection({ lesseeRows, landRows , demandRows,
               {demandRows.map((demandRow, idx) => {
                 const landRow = landRows[idx];
                 const lesseeRow = lesseeRows[idx];
+                const status = demandRow?.DemandStatus || "-";
+                const statusUpper = String(status).toUpperCase();
                 return (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-[#0b1f3b]">{lesseeRow?.LesseeName || "-"}</td>
-                    <td className="px-6 py-4 text-slate-600">{lesseeRow?.LandType || landRow?.LandType || "-"}</td>
-                    <td className="px-6 py-4 text-slate-600 font-medium">{lesseeRow?.LandName || landRow?.LandName || "-"}</td>
-                    <td className="px-6 py-4 text-center text-slate-500 font-medium">{formatDateOnly(lesseeRow?.LeaseEndDate)}</td>
+                  <tr key={demandRow?.DemandNoteID || idx} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-[#0b1f3b]">{demandRow?.name || lesseeRow?.LesseeName || "-"}</td>
+                    <td className="px-6 py-4 text-slate-600">{demandRow?.type || lesseeRow?.LandType || landRow?.LandType || "-"}</td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">{demandRow?.land || lesseeRow?.LandName || landRow?.LandName || "-"}</td>
+                    <td className="px-6 py-4 text-center text-slate-500 font-medium">{formatDateOnly(demandRow?.dueDate || lesseeRow?.LeaseEndDate)}</td>
                     <td className="px-6 py-4 text-center">
-                      {demandRow.DemandStatus === "Pending" ? (
-                        <button className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-all shadow-sm">
-                          Send for Recheck
-                        </button>
-                      ) : (
-                        <span className="inline-flex px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold ring-1 ring-inset ring-green-600/20">
-                          Approved
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ring-1 ring-inset ${
+                          statusUpper === "ISSUED"
+                            ? "bg-emerald-100 text-emerald-700 ring-emerald-600/20"
+                            : statusUpper === "REJECTED"
+                            ? "bg-red-100 text-red-700 ring-red-600/20"
+                            : statusUpper === "GENERATED"
+                            ? "bg-amber-100 text-amber-700 ring-amber-600/20"
+                            : "bg-slate-100 text-slate-700 ring-slate-300"
+                        }`}
+                      >
+                        {status}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span
                         className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ring-1 ring-inset ${
-                          lesseeRow.PaymentStatusCode === "PAID"
+                          (lesseeRow?.PaymentStatusCode || "").toUpperCase() === "PAID"
                             ? "bg-emerald-100 text-emerald-700 ring-emerald-600/20"
-                            : lesseeRow.PaymentStatusCode === "DUE" || lesseeRow.PaymentStatusCode === "BOTH DUE" || lesseeRow.PaymentStatusCode === "ALL DUE"
+                            : (lesseeRow?.PaymentStatusCode || "").toUpperCase() === "DUE" ||
+                              (lesseeRow?.PaymentStatusCode || "").toUpperCase() === "BOTH DUE" ||
+                              (lesseeRow?.PaymentStatusCode || "").toUpperCase() === "ALL DUE"
                             ? "bg-red-100 text-red-700 ring-red-600/20"
                             : "bg-amber-100 text-amber-700 ring-amber-600/20"
                         }`}
                       >
-                        {lesseeRow.PaymentStatusCode}
+                        {lesseeRow?.PaymentStatusCode || "-"}
                       </span>
                     </td>
                   </tr>

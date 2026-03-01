@@ -4,12 +4,25 @@ import sql from "mssql";
 import cors from "cors";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
+import { registerAuthRoutes } from "./routes/authRoutes.js";
+import { registerDemandRoutes } from "./routes/demandRoutes.js";
+import { registerDataRoutes } from "./routes/dataRoutes.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DEMAND_TEMPLATE_PATH = path.join(__dirname, "PPA_Lease_Renewal_Template.docx");
+const DEMAND_NOTES_DIR = path.join(__dirname, "generated-demand-notes");
+const DEMAND_TEMPLATE_RENDER_SCRIPT = path.join(__dirname, "scripts", "render-demand-note.ps1");
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
 const JWT_ISSUER = process.env.JWT_ISSUER || "ppa-lms-api";
@@ -21,14 +34,12 @@ const BLOCK_WINDOW_MS = Number(process.env.AUTH_BLOCK_WINDOW_MS || 15 * 60 * 100
 const BLOCK_DURATION_MS = Number(process.env.AUTH_BLOCK_DURATION_MS || 15 * 60 * 1000);
 
 if (!JWT_SECRET) {
-  console.warn(
-    "Warning: JWT_SECRET is not set. Set JWT_SECRET in .env before using authentication in production."
-  );
+  console.warn("Warning: JWT_SECRET is not set. Set JWT_SECRET in .env before using authentication in production.");
 }
 
 const dbConfig = {
-  user: process.env.DB_USER, //lmslog
-  password: process.env.DB_PASSWORD, //lmsppap
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER,
   database: process.env.DB_NAME,
   port: Number(process.env.DB_PORT || 1433),
@@ -48,6 +59,136 @@ const loginAttemptState = new Map();
 
 function normalizeUsername(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+async function resolveLesseeByUsername(p, username) {
+  const usernameNormalized = normalizeUsername(username);
+  if (!usernameNormalized) return null;
+
+  const result = await p
+    .request()
+    .input("usernameNormalized", sql.NVarChar(120), usernameNormalized)
+    .query(`
+      SELECT TOP 1
+        l.LesseeID,
+        l.LesseeName
+      FROM dbo.Lessees l
+      CROSS APPLY (
+        SELECT LOWER(LTRIM(RTRIM(l.LesseeName))) AS LesseeNameNormalized
+      ) n
+      WHERE
+        n.LesseeNameNormalized = @usernameNormalized
+        OR n.LesseeNameNormalized LIKE @usernameNormalized + '%'
+        OR @usernameNormalized LIKE n.LesseeNameNormalized + '%'
+        OR n.LesseeNameNormalized LIKE '%' + @usernameNormalized + '%'
+        OR @usernameNormalized LIKE '%' + n.LesseeNameNormalized + '%'
+      ORDER BY
+        CASE
+          WHEN n.LesseeNameNormalized = @usernameNormalized THEN 0
+          WHEN n.LesseeNameNormalized LIKE @usernameNormalized + '%' THEN 1
+          WHEN @usernameNormalized LIKE n.LesseeNameNormalized + '%' THEN 2
+          WHEN n.LesseeNameNormalized LIKE '%' + @usernameNormalized + '%' THEN 3
+          WHEN @usernameNormalized LIKE '%' + n.LesseeNameNormalized + '%' THEN 4
+          ELSE 9
+        END,
+        ABS(LEN(n.LesseeNameNormalized) - LEN(@usernameNormalized)),
+        LEN(n.LesseeNameNormalized)
+    `);
+
+  return result.recordset[0] || null;
+}
+
+function sanitizeFileNamePart(value) {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/\.+$/g, "");
+  return cleaned || "DemandNote";
+}
+
+function execFile(file, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderr || `${file} exited with code ${code}`));
+    });
+  });
+}
+
+let demandInfraPromise;
+async function ensureDemandNoteInfrastructure() {
+  if (!demandInfraPromise) {
+    demandInfraPromise = (async () => {
+      const p = await getPool();
+      await p.request().query(`
+        IF OBJECT_ID('dbo.DemandNotes', 'U') IS NULL
+        BEGIN
+          CREATE TABLE dbo.DemandNotes (
+            DemandNoteID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            LesseeID INT NOT NULL,
+            LeaseID INT NULL,
+            GeneratedByUserID INT NOT NULL,
+            GeneratedAt DATETIME2 NOT NULL CONSTRAINT DF_DemandNotes_GeneratedAt DEFAULT SYSUTCDATETIME(),
+            DueDate DATE NULL,
+            Amount DECIMAL(18,2) NULL,
+            Description NVARCHAR(1000) NULL,
+            DocumentPath NVARCHAR(500) NOT NULL,
+            DocumentFileName NVARCHAR(260) NOT NULL,
+            Status NVARCHAR(20) NOT NULL CONSTRAINT DF_DemandNotes_Status DEFAULT 'Generated',
+            IssuedByUserID INT NULL,
+            IssuedAt DATETIME2 NULL,
+            RejectedByUserID INT NULL,
+            RejectedAt DATETIME2 NULL,
+            AdminRemarks NVARCHAR(500) NULL,
+            CONSTRAINT FK_DemandNotes_Lessees FOREIGN KEY (LesseeID) REFERENCES dbo.Lessees(LesseeID),
+            CONSTRAINT FK_DemandNotes_LeaseDetails FOREIGN KEY (LeaseID) REFERENCES dbo.LeaseDetails(LeaseID),
+            CONSTRAINT FK_DemandNotes_GeneratedBy FOREIGN KEY (GeneratedByUserID) REFERENCES dbo.Users(UserID),
+            CONSTRAINT FK_DemandNotes_IssuedBy FOREIGN KEY (IssuedByUserID) REFERENCES dbo.Users(UserID),
+            CONSTRAINT FK_DemandNotes_RejectedBy FOREIGN KEY (RejectedByUserID) REFERENCES dbo.Users(UserID)
+          );
+        END
+      `);
+      await fs.mkdir(DEMAND_NOTES_DIR, { recursive: true });
+    })();
+  }
+  return demandInfraPromise;
+}
+
+async function renderDemandNoteDocument({ demandNoteId, fields, fileNameBase }) {
+  await fs.mkdir(DEMAND_NOTES_DIR, { recursive: true });
+  const safeBase = sanitizeFileNamePart(fileNameBase);
+  const outputFileName = `${safeBase}.docx`;
+  const outputPath = path.join(DEMAND_NOTES_DIR, outputFileName);
+  const dataPath = path.join(DEMAND_NOTES_DIR, `DemandNote_${demandNoteId}.json`);
+  await fs.writeFile(dataPath, JSON.stringify(fields), "utf8");
+  try {
+    await execFile("powershell", [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      DEMAND_TEMPLATE_RENDER_SCRIPT,
+      "-TemplatePath",
+      DEMAND_TEMPLATE_PATH,
+      "-OutputPath",
+      outputPath,
+      "-DataPath",
+      dataPath,
+    ]);
+  } finally {
+    await fs.rm(dataPath, { force: true });
+  }
+  return { outputPath, outputFileName };
 }
 
 function hashPassword(plainPassword, saltHex = crypto.randomBytes(16).toString("hex")) {
@@ -189,309 +330,34 @@ function authorizeRoles(...roles) {
 
 app.get("/", (req, res) => res.send("Server is up"));
 
-app.post("/api/auth/login", async (req, res) => {
-  const username = String(req.body?.username || "").trim();
-  const usernameNormalized = normalizeUsername(username);
-  const password = String(req.body?.password || "");
-  const requestedRole = String(req.body?.role || "").trim();
-  const rememberMe = Boolean(req.body?.rememberMe);
-  const ipAddress = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || null;
-  const userAgent = req.headers["user-agent"] || null;
+const sharedDeps = {
+  app,
+  fs,
+  sql,
+  JWT_SECRET,
+  ALLOWED_ROLES,
+  loginAttemptState,
+  getPool,
+  normalizeUsername,
+  resolveLesseeByUsername,
+  sanitizeFileNamePart,
+  ensureDemandNoteInfrastructure,
+  renderDemandNoteDocument,
+  hashPassword,
+  verifyPassword,
+  issueAccessToken,
+  getAttemptKey,
+  isBlockedAttempt,
+  registerFailedAttempt,
+  clearFailedAttempts,
+  recordAuthEvent,
+  authenticateToken,
+  authorizeRoles,
+};
 
-  if (!JWT_SECRET) {
-    return res.status(500).json({ error: "Server auth configuration is incomplete" });
-  }
-
-  if (!usernameNormalized || !password) {
-    return res.status(400).json({ error: "Username and password are required" });
-  }
-  if (requestedRole && !ALLOWED_ROLES.has(requestedRole)) {
-    return res.status(400).json({ error: "Invalid role" });
-  }
-
-  const attemptKey = getAttemptKey(req, usernameNormalized);
-  const attempt = loginAttemptState.get(attemptKey);
-  if (isBlockedAttempt(attempt)) {
-    return res.status(429).json({ error: "Too many failed attempts. Try again later." });
-  }
-
-  try {
-    const p = await getPool();
-    const result = await p
-      .request()
-      .input("usernameNormalized", sql.NVarChar(120), usernameNormalized)
-      .query(`
-        SELECT
-          u.UserID,
-          u.Username,
-          u.DisplayName,
-          u.PasswordHash,
-          u.IsActive,
-          r.RoleName
-        FROM dbo.Users u
-        INNER JOIN dbo.Roles r ON r.RoleID = u.RoleID
-        WHERE u.UsernameNormalized = @usernameNormalized
-      `);
-
-    const row = result.recordset[0];
-    const badCredResponse = { error: "Invalid username or password" };
-    if (!row || !row.IsActive || !verifyPassword(password, row.PasswordHash)) {
-      registerFailedAttempt(attemptKey);
-      await recordAuthEvent({
-        usernameAttempt: usernameNormalized,
-        actionType: "LOGIN",
-        status: "FAIL",
-        reason: "Invalid credentials",
-        ipAddress,
-        userAgent,
-      });
-      return res.status(401).json(badCredResponse);
-    }
-
-    if (requestedRole && requestedRole !== row.RoleName) {
-      registerFailedAttempt(attemptKey);
-      await recordAuthEvent({
-        userId: row.UserID,
-        usernameAttempt: usernameNormalized,
-        actionType: "LOGIN",
-        status: "FAIL",
-        reason: "Role mismatch",
-        ipAddress,
-        userAgent,
-      });
-      return res.status(403).json({ error: "Selected role does not match this account" });
-    }
-
-    clearFailedAttempts(attemptKey);
-    const user = {
-      userId: Number(row.UserID),
-      username: row.Username,
-      displayName: row.DisplayName || row.Username,
-      role: row.RoleName,
-    };
-    await p
-      .request()
-      .input("userId", sql.Int, user.userId)
-      .query("UPDATE dbo.Users SET LastLoginAt = SYSUTCDATETIME(), UpdatedAt = SYSUTCDATETIME() WHERE UserID = @userId");
-    const accessToken = issueAccessToken(user, rememberMe);
-
-    await recordAuthEvent({
-      userId: row.UserID,
-      usernameAttempt: usernameNormalized,
-      actionType: "LOGIN",
-      status: "SUCCESS",
-      reason: null,
-      ipAddress,
-      userAgent,
-    });
-
-    return res.json({
-      token: accessToken,
-      user: {
-        id: user.userId,
-        username: user.username,
-        displayName: user.displayName,
-        role: user.role,
-      },
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Authentication failed" });
-  }
-});
-
-app.get("/api/auth/me", authenticateToken, async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p
-      .request()
-      .input("userId", sql.Int, req.user.userId)
-      .query(`
-        SELECT
-          u.UserID,
-          u.Username,
-          u.DisplayName,
-          u.IsActive,
-          r.RoleName
-        FROM dbo.Users u
-        INNER JOIN dbo.Roles r ON r.RoleID = u.RoleID
-        WHERE u.UserID = @userId
-      `);
-
-    const row = result.recordset[0];
-    if (!row || !row.IsActive) {
-      return res.status(401).json({ error: "User session is no longer valid" });
-    }
-
-    return res.json({
-      user: {
-        id: Number(row.UserID),
-        username: row.Username,
-        displayName: row.DisplayName || row.Username,
-        role: row.RoleName,
-      },
-    });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Session check failed" });
-  }
-});
-
-app.post("/api/auth/change-password", authenticateToken, async (req, res) => {
-  const currentPassword = String(req.body?.currentPassword || "");
-  const newPassword = String(req.body?.newPassword || "");
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: "Current and new passwords are required" });
-  }
-  if (newPassword.length < 12) {
-    return res.status(400).json({ error: "New password must be at least 12 characters" });
-  }
-
-  try {
-    const p = await getPool();
-    const userResult = await p
-      .request()
-      .input("userId", sql.Int, req.user.userId)
-      .query("SELECT UserID, PasswordHash, IsActive FROM dbo.Users WHERE UserID = @userId");
-
-    const row = userResult.recordset[0];
-    if (!row || !row.IsActive || !verifyPassword(currentPassword, row.PasswordHash)) {
-      return res.status(401).json({ error: "Current password is incorrect" });
-    }
-
-    const nextHash = hashPassword(newPassword);
-    await p
-      .request()
-      .input("userId", sql.Int, req.user.userId)
-      .input("passwordHash", sql.NVarChar(sql.MAX), nextHash)
-      .query(`
-        UPDATE dbo.Users
-        SET PasswordHash = @passwordHash, UpdatedAt = SYSUTCDATETIME()
-        WHERE UserID = @userId
-      `);
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Password update failed" });
-  }
-});
-
-app.get("/api/LesseeFullView", authenticateToken, authorizeRoles("Manager", "Admin"), async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request().query("SELECT * FROM LesseeFullView");
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/LandData", authenticateToken, authorizeRoles("Manager", "Admin"), async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request().query("SELECT * FROM LandData");
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/EoiTable", authenticateToken, authorizeRoles("Manager", "Admin"), async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request().query("SELECT * FROM EOITable");
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/DemandNotes", authenticateToken, authorizeRoles("Manager", "Admin"), async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request().query("SELECT * FROM DemandNotes");
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/UserProfile", authenticateToken, authorizeRoles("Manager", "Admin", "User"), async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request()
-              .input("username", sql.NVarChar(120), String(req.user.username || ""))
-              .query("SELECT CompanyName, OrganisationType, AuthorityName, EmailId, Address, Phone FROM UserProfile WHERE AuthorityName = @username");
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/UserData", authenticateToken, authorizeRoles("Manager", "Admin", "User"), async (req, res) => {
-  try {
-    const p = await getPool();
-    let result;
-    if (req.user?.role === "User") {
-      // User accounts should see only their own rows.
-      result = await p
-        .request()
-        .input("authUserId", sql.Int, Number(req.user.userId) || null)
-        .input("username", sql.NVarChar(120), String(req.user.username || ""))
-        .query(`
-          SELECT *
-          FROM UserData
-          WHERE UserID = @authUserId
-             OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@username)))
-        `);
-    } else {
-      result = await p.request().query("SELECT * FROM UserData");
-    }
-    res.json(result.recordset);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-app.get("/api/UserData/:userId", authenticateToken, async (req, res) => {
-  try {
-    const p = await getPool();
-    const result = await p.request()
-      .input("userId", sql.Int, Number(req.params.userId))
-      .query(`
-        SELECT *
-        FROM LesseeFullView
-        WHERE UserID = @userId
-      `);
-    res.json(result.recordset); // not recordset[0]
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "DB query failed" });
-  }
-});
-
-
-
-// app.get("/api/lessee/:id", async (req, res) => {
-//   try {
-//     const p = await getPool();
-//     const result = await p
-//       .request()
-//       .input("id", sql.Int, Number(req.params.id))
-//       .query("SELECT * FROM Lessee WHERE LesseeID = @id");
-//     res.json(result.recordset[0] || null);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "DB query failed" });
-//   }
-// });
+registerAuthRoutes(app, sharedDeps);
+registerDemandRoutes(app, sharedDeps);
+registerDataRoutes(app, sharedDeps);
 
 app.listen(process.env.PORT || 5000, () => {
   console.log(`API running on port ${process.env.PORT || 5000}`);
